@@ -1,15 +1,15 @@
 # Performance baselines
 
-Run the internal performance harness from `src/mainview/getdown/`:
+Run the internal performance harness from the repository root:
 
 ```bash
-bun run perf:baseline
+bun run src/mainview/getdown/perf/baseline.tsx
 ```
 
 Save a timestamped JSON snapshot for future comparison:
 
 ```bash
-bun run perf:baseline:save
+bun run src/mainview/getdown/perf/baseline.tsx --save
 ```
 
 The harness reports:
@@ -28,7 +28,7 @@ Benchmark groups:
 
 ## Current baseline
 
-Captured with `bun run perf:baseline` on May 6, 2026.
+Captured with `bun run src/mainview/getdown/perf/baseline.tsx` on May 6, 2026.
 
 | group | case | mean/op | p95/op | heap Δ/op | retained Δ/op | retained obj/op |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |

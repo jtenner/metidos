@@ -4,13 +4,13 @@ Compact guide for coding agents working in this repository.
 
 ## Project overview
 
-`getdown` is a TypeScript/Bun package that exposes a React component API for rendering GitHub Flavored Markdown.
+`getdown` is TypeScript/Bun source that exposes a React component API for rendering GitHub Flavored Markdown inside the mainview.
 
-- Package entrypoint: `index.ts`
+- Source entrypoint: `index.ts`
 - Public exports: `src/index.tsx`
 - Runtime target: Bun + React
 - Module type: ESM
-- TypeScript config: `tsconfig.json`
+- TypeScript config: root `tsconfig.json`
 
 ## Important paths
 
@@ -25,21 +25,21 @@ Compact guide for coding agents working in this repository.
 
 ## Commands
 
-Run from `src/mainview/getdown/`, where this package's local `package.json` defines the typecheck and performance scripts:
+Run from the repository root:
 
 ```bash
-bun test
+bun test src/mainview/getdown
 bun run typecheck
-bun run perf:baseline
+bun run src/mainview/getdown/perf/baseline.tsx
 ```
 
-Useful scripts in `package.json`:
+Useful commands:
 
-- `test` — `bun test`
-- `typecheck` — `tsc --noEmit`
-- `perf:baseline` — print timing/heap baseline
-- `perf:baseline:json` — print JSON baseline
-- `perf:baseline:save` — save timestamped JSON under `perf/baselines/`
+- `bun test src/mainview/getdown` — run GetDown tests
+- `bun run typecheck` — typecheck via the root TypeScript config
+- `bun run src/mainview/getdown/perf/baseline.tsx` — print timing/heap baseline
+- `bun run src/mainview/getdown/perf/baseline.tsx --json` — print JSON baseline
+- `bun run src/mainview/getdown/perf/baseline.tsx --save` — save timestamped JSON under `perf/baselines/`
 
 ## Parser notes
 
@@ -51,10 +51,10 @@ Useful scripts in `package.json`:
 
 ## Development expectations
 
-- Keep public API exports in `src/index.tsx` and root `index.ts` aligned.
+- Keep public API exports in `src/index.tsx` and `index.ts` aligned.
 - Prefer adding/adjusting rendering cases in `src/getdown.test.tsx` for Markdown behavior changes.
 - Add focused parser tests in `src/core/*.test.ts` for structural or parser-internal behavior.
-- After parser/rendering changes, run `bun test` and `bun run typecheck`.
+- After parser/rendering changes, run `bun test src/mainview/getdown` and `bun run typecheck` from the repository root.
 - For streaming/performance-sensitive changes, run `bun run perf:baseline` and compare against `perf/README.md`.
 
 ## Style notes

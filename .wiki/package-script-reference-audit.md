@@ -2,6 +2,8 @@
 
 Summary: On 2026-06-01, repository documentation, workflows, templates, and checked-in package manifests were scanned for `bun run`, `npm run`, `pnpm run`, and `yarn run` script references. All current script-like references resolve to a package script in the relevant package, except references that intentionally execute a file path such as `bun run src/bun/start.ts` or `bun run native/.../build.ts`.
 
+Update: On 2026-06-15, GetDown was converted from a nested Bun package into source-only mainview code. Its commands now run from the repository root via root scripts or direct Bun file execution.
+
 ## Scope
 
 Scanned text files with `.md`, `.yml`, `.yaml`, and `.json` extensions, excluding ignored or derived local state such as `.git`, `node_modules`, `.metidos`, `.metidos-build`, and `.tmp`.
@@ -9,7 +11,6 @@ Scanned text files with `.md`, `.yml`, `.yaml`, and `.json` extensions, excludin
 Relevant package manifests:
 
 - Root `package.json`
-- `src/mainview/getdown/package.json`
 
 ## Observed current state
 
@@ -41,12 +42,12 @@ Root documentation and workflow references resolve to existing root scripts incl
 - `website:build`
 - `website:watch`
 
-The nested Getdown package documentation resolves to existing scripts in `src/mainview/getdown/package.json`:
+GetDown documentation now uses repository-root commands:
 
-- `test`
-- `typecheck`
-- `perf:baseline`
-- `perf:baseline:save`
+- `bun test src/mainview/getdown`
+- `bun run typecheck`
+- `bun run src/mainview/getdown/perf/baseline.tsx`
+- `bun run src/mainview/getdown/perf/baseline.tsx --save`
 
 ## Not treated as missing package scripts
 
@@ -56,14 +57,14 @@ Several matches are direct Bun file execution rather than package script referen
 - `bun run src/bun/index.ts`
 - `bun run native/sqlite-security-extension/build.ts`
 - `bun run deploy/podman/migrate-app-data.ts`
-- `bun run perf/baseline.tsx`
+- `bun run src/mainview/getdown/perf/baseline.tsx`
 
 A historical wiki-log sentence mentions that `bun run test:a11y` does not exist. That sentence is not an instruction to run the missing script; it records the prior documentation correction.
 
 ## Validation performed
 
 - Parsed `package.json` script names.
-- Parsed `src/mainview/getdown/package.json` script names.
+- Confirmed `src/mainview/getdown/` is source-only and has no nested package script namespace.
 - Searched documentation, workflows, templates, and package manifests for package-manager `run` references.
 - Re-ran the scanner with ignored/derived directories excluded and found 233 script-like references with 0 unresolved package-script names.
 - Manually reviewed apparent missing matches and classified path executions separately from package script names.
@@ -98,7 +99,7 @@ Recommended clean-clone handling:
 
 The clean-clone result log should state that watch/start scripts are long-running by design and that a timeout is expected after readiness is observed. A timeout before readiness, or any startup error, should be recorded as a failure with the observed logs.
 
-## Clean checkout Getdown script smoke run
+## Historical clean checkout Getdown script smoke run
 
 On 2026-06-02, the documented nested Getdown package scripts were smoke-run from a disposable detached Git worktree at `.tmp/getdown-smoke`, with dependencies installed only inside `src/mainview/getdown/` from its checked-in `bun.lock`.
 
@@ -117,7 +118,7 @@ Commands and outcomes:
 - `bun run typecheck` passed: `tsc --noEmit` completed without diagnostics.
 - `bun run perf:baseline` passed and printed the bounded Getdown internal performance baseline table. No baseline artifact was saved.
 
-This covered the documented `bun test`, `bun run typecheck`, and bounded performance baseline path for the nested package from a disposable checkout. It did not run `bun run perf:baseline:save`, because that command intentionally creates a timestamped JSON snapshot under `perf/baselines/` and is only needed when updating stored performance data.
+This covered the then-documented `bun test`, `bun run typecheck`, and bounded performance baseline path for the nested package from a disposable checkout. As of 2026-06-15, these nested package scripts are historical; GetDown validation uses repository-root commands instead.
 
 ## Clean disposable checkout root script smoke run
 

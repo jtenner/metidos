@@ -2,14 +2,14 @@
 
 Summary: On 2026-06-02, the checked-in package manifests and Bun lockfiles were audited for private packages, unpublished/local dependencies, private registry URLs, and machine-specific references. No blocking dependency declaration or lockfile references were found.
 
+Update: On 2026-06-15, GetDown was folded into the mainview as source-only code. The nested `src/mainview/getdown/package.json` and `src/mainview/getdown/bun.lock` files were removed, leaving the root `package.json` and `bun.lock` as the only Bun package manifest and lockfile pair.
+
 ## Scope
 
 Observed files:
 
 - `package.json`
 - `bun.lock`
-- `src/mainview/getdown/package.json`
-- `src/mainview/getdown/bun.lock`
 
 Package-manager config files checked and not found:
 
@@ -33,7 +33,7 @@ The audit searched package manifests and Bun lockfiles for dependency forms and 
 
 - No local path, workspace, Git, GitHub, private registry, localhost, machine-local path, `@jtenner`, or `@metidos` references were found in the checked manifests or lockfiles.
 - The root `package.json` has `"private": true`; this is expected for the application repository package and is not a private dependency declaration.
-- `src/mainview/getdown/package.json` has `"private": false`; this package declaration does not reference private package sources.
+- GetDown is source-only under `src/mainview/getdown/` and no longer has a nested package manifest or lockfile.
 - The root `patchedDependencies` entry for `@mariozechner/pi-coding-agent@0.73.1` points to a checked-in patch file under `patches/`, not a local machine path or private registry.
 
 ## Validation commands
@@ -43,8 +43,8 @@ Commands run from the workspace root:
 ```sh
 find . -name package.json
 find . -name 'bun.lock*'
-grep -R -n -i -E 'file:|link:|workspace:|npm.pkg|github:|git\+|registry|localhost|127\.0\.0\.1|/home/|private|@jtenner|@metidos' -- package.json src/mainview/getdown/package.json
-grep -R -n -i -E 'file:|link:|workspace:|npm.pkg|github:|git\+|registry|localhost|127\.0\.0\.1|/home/|@jtenner|@metidos' -- bun.lock src/mainview/getdown/bun.lock
+grep -R -n -i -E 'file:|link:|workspace:|npm.pkg|github:|git\+|registry|localhost|127\.0\.0\.1|/home/|private|@jtenner|@metidos' -- package.json
+grep -R -n -i -E 'file:|link:|workspace:|npm.pkg|github:|git\+|registry|localhost|127\.0\.0\.1|/home/|@jtenner|@metidos' -- bun.lock
 find . -name .npmrc -o -name '.yarnrc*' -o -name pnpm-lock.yaml -o -name package-lock.json -o -name yarn.lock
 ```
 

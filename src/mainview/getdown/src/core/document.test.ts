@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { parseDocument } from "./document";
 
-function blockquoteDepth(blocks: ReturnType<typeof parseDocument>["blocks"]): number {
+function blockquoteDepth(
+  blocks: ReturnType<typeof parseDocument>["blocks"],
+): number {
   const block = blocks[0];
   if (block?.kind !== "blockquote") {
     return 0;
@@ -30,17 +32,23 @@ describe("parseDocument structural sharing", () => {
 
   test("reuses blocks before and after a middle edit", () => {
     const previous = parseDocument("# Alpha\n\nOriginal middle.\n\n# Gamma");
-    const next = parseDocument("# Alpha\n\nChanged middle.\n\n# Gamma", previous);
+    const next = parseDocument(
+      "# Alpha\n\nChanged middle.\n\n# Gamma",
+      previous,
+    );
 
     expect(next.blocks).toHaveLength(3);
-    expect(next.blocks[0]).toBe(previous.blocks[0]);  // # Alpha reused
+    expect(next.blocks[0]).toBe(previous.blocks[0]); // # Alpha reused
     expect(next.blocks[1]).not.toBe(previous.blocks[1]); // middle changed
-    expect(next.blocks[2]).toBe(previous.blocks[2]);  // # Gamma reused
+    expect(next.blocks[2]).toBe(previous.blocks[2]); // # Gamma reused
   });
 
   test("reuses trailing blocks when first block changes", () => {
     const previous = parseDocument("# Alpha\n\nBeta.\n\n# Gamma");
-    const next = parseDocument("# Alpha Modified\n\nBeta.\n\n# Gamma", previous);
+    const next = parseDocument(
+      "# Alpha Modified\n\nBeta.\n\n# Gamma",
+      previous,
+    );
 
     expect(next.blocks).toHaveLength(3);
     expect(next.blocks[0]).not.toBe(previous.blocks[0]); // heading changed
@@ -68,11 +76,16 @@ describe("parseDocument structural sharing", () => {
 
   test("reuses all leading blocks in a large document when appending to the final block", () => {
     const sections = 32;
-    const prefix = Array.from({ length: sections }, (_, i) =>
-      `## Section ${i + 1}\n\nParagraph ${i + 1} with *emphasis* and \`code\`.`
+    const prefix = Array.from(
+      { length: sections },
+      (_, i) =>
+        `## Section ${i + 1}\n\nParagraph ${i + 1} with *emphasis* and \`code\`.`,
     ).join("\n\n");
     const previous = parseDocument(prefix + "\n\nFinal block incomple");
-    const next = parseDocument(prefix + "\n\nFinal block incomplete but growing", previous);
+    const next = parseDocument(
+      prefix + "\n\nFinal block incomplete but growing",
+      previous,
+    );
 
     // All leading blocks should be reusable
     expect(next.blocks).toHaveLength(previous.blocks.length);
@@ -80,7 +93,9 @@ describe("parseDocument structural sharing", () => {
       expect(next.blocks[index]).toBe(previous.blocks[index]);
     }
     // Final block changed (paragraph appended)
-    expect(next.blocks[next.blocks.length - 1]).not.toBe(previous.blocks[previous.blocks.length - 1]);
+    expect(next.blocks[next.blocks.length - 1]).not.toBe(
+      previous.blocks[previous.blocks.length - 1],
+    );
   });
 
   test("reuses blocks when only whitespace changes in a non-semantic way", () => {
@@ -94,8 +109,13 @@ describe("parseDocument structural sharing", () => {
   });
 
   test("returns the same object when previous content is identical", () => {
-    const previous = parseDocument("# Title\n\nParagraph with **bold** and `code`.\n\n> Quote");
-    const next = parseDocument("# Title\n\nParagraph with **bold** and `code`.\n\n> Quote", previous);
+    const previous = parseDocument(
+      "# Title\n\nParagraph with **bold** and `code`.\n\n> Quote",
+    );
+    const next = parseDocument(
+      "# Title\n\nParagraph with **bold** and `code`.\n\n> Quote",
+      previous,
+    );
 
     expect(next).toBe(previous);
   });

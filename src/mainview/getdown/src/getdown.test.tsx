@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { GetDown, type GetDownBoldProps, type GetDownCodeBlockProps, type GetDownInlineCodeProps, type GetDownLinkProps, type GetDownTableCellProps, type GetDownTableProps } from "./index";
+import {
+  GetDown,
+  type GetDownBoldProps,
+  type GetDownCodeBlockProps,
+  type GetDownInlineCodeProps,
+  type GetDownLinkProps,
+  type GetDownTableCellProps,
+  type GetDownTableProps,
+} from "./index";
 
 interface GfmRenderingCase {
   section: string;
@@ -10,7 +18,9 @@ interface GfmRenderingCase {
 }
 
 function render(markdown: string): string {
-  return normalizeStaticMarkup(renderToStaticMarkup(<GetDown content={markdown} />));
+  return normalizeStaticMarkup(
+    renderToStaticMarkup(<GetDown content={markdown} />),
+  );
 }
 
 function renderWithProps(props: Parameters<typeof GetDown>[0]): string {
@@ -500,7 +510,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "code spans",
     name: "code span inside link text is literal",
     markdown: "[`code` link](https://example.com)",
-    html: "<p><a href=\"https://example.com\"><code>code</code> link</a></p>",
+    html: '<p><a href="https://example.com"><code>code</code> link</a></p>',
   },
   {
     section: "code spans",
@@ -512,37 +522,37 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "links",
     name: "inline link",
     markdown: "[GitHub](https://github.com)",
-    html: "<p><a href=\"https://github.com\">GitHub</a></p>",
+    html: '<p><a href="https://github.com">GitHub</a></p>',
   },
   {
     section: "links",
     name: "inline link with title",
-    markdown: "[GitHub](https://github.com \"GitHub home\")",
-    html: "<p><a href=\"https://github.com\" title=\"GitHub home\">GitHub</a></p>",
+    markdown: '[GitHub](https://github.com "GitHub home")',
+    html: '<p><a href="https://github.com" title="GitHub home">GitHub</a></p>',
   },
   {
     section: "links",
     name: "link text contains emphasis",
     markdown: "[*GitHub*](https://github.com)",
-    html: "<p><a href=\"https://github.com\"><em>GitHub</em></a></p>",
+    html: '<p><a href="https://github.com"><em>GitHub</em></a></p>',
   },
   {
     section: "links",
     name: "reference link full",
-    markdown: "[GitHub][gh]\n\n[gh]: https://github.com \"GitHub home\"",
-    html: "<p><a href=\"https://github.com\" title=\"GitHub home\">GitHub</a></p>",
+    markdown: '[GitHub][gh]\n\n[gh]: https://github.com "GitHub home"',
+    html: '<p><a href="https://github.com" title="GitHub home">GitHub</a></p>',
   },
   {
     section: "links",
     name: "reference link collapsed",
     markdown: "[GitHub][]\n\n[GitHub]: https://github.com",
-    html: "<p><a href=\"https://github.com\">GitHub</a></p>",
+    html: '<p><a href="https://github.com">GitHub</a></p>',
   },
   {
     section: "links",
     name: "reference link shortcut",
     markdown: "[GitHub]\n\n[GitHub]: https://github.com",
-    html: "<p><a href=\"https://github.com\">GitHub</a></p>",
+    html: '<p><a href="https://github.com">GitHub</a></p>',
   },
   {
     section: "links",
@@ -554,169 +564,169 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "links",
     name: "inline link with angle brackets around destination",
     markdown: "[link](<https://github.com>)",
-    html: "<p><a href=\"https://github.com\">link</a></p>",
+    html: '<p><a href="https://github.com">link</a></p>',
   },
   {
     section: "links",
     name: "inline link with empty destination",
     markdown: "[link]()",
-    html: "<p><a href=\"\">link</a></p>",
+    html: '<p><a href="">link</a></p>',
   },
   {
     section: "links",
     name: "inline link with empty text",
     markdown: "[](https://github.com)",
-    html: "<p><a href=\"https://github.com\"></a></p>",
+    html: '<p><a href="https://github.com"></a></p>',
   },
   {
     section: "links",
     name: "reference link with title in parentheses",
     markdown: "[id]: https://example.com (title)\n\n[id]",
-    html: "<p><a href=\"https://example.com\" title=\"title\">id</a></p>",
+    html: '<p><a href="https://example.com" title="title">id</a></p>',
   },
   {
     section: "links",
     name: "link containing code span",
     markdown: "[`code`](https://github.com)",
-    html: "<p><a href=\"https://github.com\"><code>code</code></a></p>",
+    html: '<p><a href="https://github.com"><code>code</code></a></p>',
   },
   {
     section: "links",
     name: "nested link brackets are literal",
     markdown: "[outer [inner] brackets](https://github.com)",
-    html: "<p><a href=\"https://github.com\">outer [inner] brackets</a></p>",
+    html: '<p><a href="https://github.com">outer [inner] brackets</a></p>',
   },
   {
     section: "links",
     name: "link destination with percent encoding",
     markdown: "[link](https://example.com/a%20b)",
-    html: "<p><a href=\"https://example.com/a%20b\">link</a></p>",
+    html: '<p><a href="https://example.com/a%20b">link</a></p>',
   },
   {
     section: "links",
     name: "duplicate reference definition uses first",
     markdown: "[id]: https://first.com\n[id]: https://second.com\n\n[id]",
-    html: "<p><a href=\"https://first.com\">id</a></p>",
+    html: '<p><a href="https://first.com">id</a></p>',
   },
   {
     section: "links",
     name: "directionless link definition",
     markdown: "[foo]\n\n[foo]: https://example.com",
-    html: "<p><a href=\"https://example.com\">foo</a></p>",
+    html: '<p><a href="https://example.com">foo</a></p>',
   },
   {
     section: "images",
     name: "inline image",
     markdown: "![Alt text](https://example.com/image.png)",
-    html: "<p><img src=\"https://example.com/image.png\" alt=\"Alt text\" /></p>",
+    html: '<p><img src="https://example.com/image.png" alt="Alt text" /></p>',
   },
   {
     section: "images",
     name: "inline image with title",
-    markdown: "![Alt text](https://example.com/image.png \"Image title\")",
-    html: "<p><img src=\"https://example.com/image.png\" alt=\"Alt text\" title=\"Image title\" /></p>",
+    markdown: '![Alt text](https://example.com/image.png "Image title")',
+    html: '<p><img src="https://example.com/image.png" alt="Alt text" title="Image title" /></p>',
   },
   {
     section: "images",
     name: "image alt text is plain text",
     markdown: "![*Alt* `code`](https://example.com/image.png)",
-    html: "<p><img src=\"https://example.com/image.png\" alt=\"Alt code\" /></p>",
+    html: '<p><img src="https://example.com/image.png" alt="Alt code" /></p>',
   },
   {
     section: "images",
     name: "reference image",
     markdown: "![alt][img]\n\n[img]: https://example.com/image.png",
-    html: "<p><img src=\"https://example.com/image.png\" alt=\"alt\" /></p>",
+    html: '<p><img src="https://example.com/image.png" alt="alt" /></p>',
   },
   {
     section: "images",
     name: "shortcut reference image",
     markdown: "![alt]\n\n[alt]: https://example.com/image.png",
-    html: "<p><img src=\"https://example.com/image.png\" alt=\"alt\" /></p>",
+    html: '<p><img src="https://example.com/image.png" alt="alt" /></p>',
   },
   {
     section: "images",
     name: "image with empty alt text",
     markdown: "![](https://example.com/image.png)",
-    html: "<p><img src=\"https://example.com/image.png\" alt=\"\" /></p>",
+    html: '<p><img src="https://example.com/image.png" alt="" /></p>',
   },
   {
     section: "images",
     name: "image with empty src is rendered without src",
     markdown: "![alt]()",
-    html: "<p><img alt=\"alt\" /></p>",
+    html: '<p><img alt="alt" /></p>',
   },
   {
     section: "images",
     name: "image inside link",
     markdown: "[![alt](image.png)](https://example.com)",
-    html: "<p><a href=\"https://example.com\"><img src=\"image.png\" alt=\"alt\" /></a></p>",
+    html: '<p><a href="https://example.com"><img src="image.png" alt="alt" /></a></p>',
   },
   {
     section: "images",
     name: "image alt text contains characters that need escaping",
     markdown: "![alt & text](https://example.com/image.png)",
-    html: "<p><img src=\"https://example.com/image.png\" alt=\"alt &amp; text\" /></p>",
+    html: '<p><img src="https://example.com/image.png" alt="alt &amp; text" /></p>',
   },
   {
     section: "autolinks",
     name: "angle bracket autolink",
     markdown: "<https://github.com>",
-    html: "<p><a href=\"https://github.com\">https://github.com</a></p>",
+    html: '<p><a href="https://github.com">https://github.com</a></p>',
   },
   {
     section: "autolinks",
     name: "email autolink",
     markdown: "<user@example.com>",
-    html: "<p><a href=\"mailto:user@example.com\">user@example.com</a></p>",
+    html: '<p><a href="mailto:user@example.com">user@example.com</a></p>',
   },
   {
     section: "autolinks",
     name: "gfm literal url autolink",
     markdown: "Visit https://github.com now.",
-    html: "<p>Visit <a href=\"https://github.com\">https://github.com</a> now.</p>",
+    html: '<p>Visit <a href="https://github.com">https://github.com</a> now.</p>',
   },
   {
     section: "autolinks",
     name: "gfm literal www autolink",
     markdown: "Visit www.github.com now.",
-    html: "<p>Visit <a href=\"http://www.github.com\">www.github.com</a> now.</p>",
+    html: '<p>Visit <a href="http://www.github.com">www.github.com</a> now.</p>',
   },
   {
     section: "autolinks",
     name: "gfm literal email autolink",
     markdown: "Email user@example.com please.",
-    html: "<p>Email <a href=\"mailto:user@example.com\">user@example.com</a> please.</p>",
+    html: '<p>Email <a href="mailto:user@example.com">user@example.com</a> please.</p>',
   },
   {
     section: "autolinks",
     name: "url autolink with path and query",
     markdown: "<https://github.com/user/repo?q=foo>",
-    html: "<p><a href=\"https://github.com/user/repo?q=foo\">https://github.com/user/repo?q=foo</a></p>",
+    html: '<p><a href="https://github.com/user/repo?q=foo">https://github.com/user/repo?q=foo</a></p>',
   },
   {
     section: "autolinks",
     name: "email autolink with plus sign",
     markdown: "<user+tag@example.com>",
-    html: "<p><a href=\"mailto:user+tag@example.com\">user+tag@example.com</a></p>",
+    html: '<p><a href="mailto:user+tag@example.com">user+tag@example.com</a></p>',
   },
   {
     section: "autolinks",
     name: "gfm www autolink with path",
     markdown: "Visit www.example.com/page now.",
-    html: "<p>Visit <a href=\"http://www.example.com/page\">www.example.com/page</a> now.</p>",
+    html: '<p>Visit <a href="http://www.example.com/page">www.example.com/page</a> now.</p>',
   },
   {
     section: "autolinks",
     name: "url autolink followed by punctuation is not part of link",
     markdown: "Visit https://github.com. now.",
-    html: "<p>Visit <a href=\"https://github.com\">https://github.com</a>. now.</p>",
+    html: '<p>Visit <a href="https://github.com">https://github.com</a>. now.</p>',
   },
   {
     section: "autolinks",
     name: "email autolink followed by period",
     markdown: "Email user@example.com.",
-    html: "<p>Email <a href=\"mailto:user@example.com\">user@example.com</a>.</p>",
+    html: '<p>Email <a href="mailto:user@example.com">user@example.com</a>.</p>',
   },
   {
     section: "lists",
@@ -740,7 +750,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "lists",
     name: "ordered list preserves start number",
     markdown: "3. three\n4. four",
-    html: "<ol start=\"3\"><li>three</li><li>four</li></ol>",
+    html: '<ol start="3"><li>three</li><li>four</li></ol>',
   },
   {
     section: "lists",
@@ -818,13 +828,13 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "lists",
     name: "ordered list with right paren and start number",
     markdown: "3) three\n4) four",
-    html: "<ol start=\"3\"><li>three</li><li>four</li></ol>",
+    html: '<ol start="3"><li>three</li><li>four</li></ol>',
   },
   {
     section: "lists",
     name: "ordered list maintains start number with nesting",
     markdown: "3. three\n   4. nested",
-    html: "<ol start=\"3\"><li>three<ol start=\"4\"><li>nested</li></ol></li></ol>",
+    html: '<ol start="3"><li>three<ol start="4"><li>nested</li></ol></li></ol>',
   },
   {
     section: "lists",
@@ -842,31 +852,31 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "task lists",
     name: "unchecked task list item",
     markdown: "- [ ] todo",
-    html: "<ul><li><input type=\"checkbox\" disabled=\"\" /> todo</li></ul>",
+    html: '<ul><li><input type="checkbox" disabled="" /> todo</li></ul>',
   },
   {
     section: "task lists",
     name: "checked task list item lowercase x",
     markdown: "- [x] done",
-    html: "<ul><li><input type=\"checkbox\" disabled=\"\" checked=\"\" /> done</li></ul>",
+    html: '<ul><li><input type="checkbox" disabled="" checked="" /> done</li></ul>',
   },
   {
     section: "task lists",
     name: "checked task list item uppercase x",
     markdown: "- [X] done",
-    html: "<ul><li><input type=\"checkbox\" disabled=\"\" checked=\"\" /> done</li></ul>",
+    html: '<ul><li><input type="checkbox" disabled="" checked="" /> done</li></ul>',
   },
   {
     section: "task lists",
     name: "nested task list items",
     markdown: "- [x] parent\n  - [ ] child",
-    html: "<ul><li><input type=\"checkbox\" disabled=\"\" checked=\"\" /> parent<ul><li><input type=\"checkbox\" disabled=\"\" /> child</li></ul></li></ul>",
+    html: '<ul><li><input type="checkbox" disabled="" checked="" /> parent<ul><li><input type="checkbox" disabled="" /> child</li></ul></li></ul>',
   },
   {
     section: "task lists",
     name: "task list in ordered list",
     markdown: "1. [x] done\n2. [ ] todo",
-    html: "<ol><li><input type=\"checkbox\" disabled=\"\" checked=\"\" /> done</li><li><input type=\"checkbox\" disabled=\"\" /> todo</li></ol>",
+    html: '<ol><li><input type="checkbox" disabled="" checked="" /> done</li><li><input type="checkbox" disabled="" /> todo</li></ol>',
   },
   {
     section: "task lists",
@@ -884,7 +894,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "task lists",
     name: "task list item with paragraph continuation",
     markdown: "- [x] done\n  continued",
-    html: "<ul><li><input type=\"checkbox\" disabled=\"\" checked=\"\" /> done\ncontinued</li></ul>",
+    html: '<ul><li><input type="checkbox" disabled="" checked="" /> done\ncontinued</li></ul>',
   },
   {
     section: "block quotes",
@@ -968,13 +978,13 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "code blocks",
     name: "fenced code block with info string",
     markdown: "```ts\nconst x: number = 1;\n```",
-    html: "<pre><code class=\"language-ts\">const x: number = 1;\n</code></pre>",
+    html: '<pre><code class="language-ts">const x: number = 1;\n</code></pre>',
   },
   {
     section: "code blocks",
     name: "fenced code block escapes html",
     markdown: "```html\n<div>safe text</div>\n```",
-    html: "<pre><code class=\"language-html\">&lt;div&gt;safe text&lt;/div&gt;\n</code></pre>",
+    html: '<pre><code class="language-html">&lt;div&gt;safe text&lt;/div&gt;\n</code></pre>',
   },
   {
     section: "code blocks",
@@ -1028,7 +1038,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "code blocks",
     name: "fenced code block with trailing spaces in info string",
     markdown: "```ts  \ncode\n```",
-    html: "<pre><code class=\"language-ts\">code\n</code></pre>",
+    html: '<pre><code class="language-ts">code\n</code></pre>',
   },
   {
     section: "html",
@@ -1063,7 +1073,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
   {
     section: "html",
     name: "inline html with attributes is escaped",
-    markdown: "alpha <span class=\"highlight\">beta</span> gamma",
+    markdown: 'alpha <span class="highlight">beta</span> gamma',
     html: "<p>alpha &lt;span class=&quot;highlight&quot;&gt;beta&lt;/span&gt; gamma</p>",
   },
   {
@@ -1093,8 +1103,9 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
   {
     section: "tables",
     name: "table alignments",
-    markdown: "| Left | Center | Right |\n| :--- | :----: | ----: |\n| a | b | c |",
-    html: "<table><thead><tr><th align=\"left\">Left</th><th align=\"center\">Center</th><th align=\"right\">Right</th></tr></thead><tbody><tr><td align=\"left\">a</td><td align=\"center\">b</td><td align=\"right\">c</td></tr></tbody></table>",
+    markdown:
+      "| Left | Center | Right |\n| :--- | :----: | ----: |\n| a | b | c |",
+    html: '<table><thead><tr><th align="left">Left</th><th align="center">Center</th><th align="right">Right</th></tr></thead><tbody><tr><td align="left">a</td><td align="center">b</td><td align="right">c</td></tr></tbody></table>',
   },
   {
     section: "tables",
@@ -1166,7 +1177,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "tables",
     name: "table with center alignment only",
     markdown: "| A |\n| :---: |\n| 1 |",
-    html: "<table><thead><tr><th align=\"center\">A</th></tr></thead><tbody><tr><td align=\"center\">1</td></tr></tbody></table>",
+    html: '<table><thead><tr><th align="center">A</th></tr></thead><tbody><tr><td align="center">1</td></tr></tbody></table>',
   },
   {
     section: "definitions",
@@ -1178,7 +1189,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "definitions",
     name: "link definition can be indented up to three spaces",
     markdown: "   [id]: https://example.com\n\n[id]",
-    html: "<p><a href=\"https://example.com\">id</a></p>",
+    html: '<p><a href="https://example.com">id</a></p>',
   },
   {
     section: "definitions",
@@ -1190,43 +1201,45 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "definitions",
     name: "link definition with title in parentheses",
     markdown: "[id]: https://example.com (title)\n\n[id]",
-    html: "<p><a href=\"https://example.com\" title=\"title\">id</a></p>",
+    html: '<p><a href="https://example.com" title="title">id</a></p>',
   },
   {
     section: "definitions",
     name: "link definition label is case-insensitive",
     markdown: "[ID]: https://example.com\n\n[id]",
-    html: "<p><a href=\"https://example.com\">id</a></p>",
+    html: '<p><a href="https://example.com">id</a></p>',
   },
   {
     section: "definitions",
     name: "link definition label folding trims whitespace",
     markdown: "[  id  ]: https://example.com\n\n[id]",
-    html: "<p><a href=\"https://example.com\">id</a></p>",
+    html: '<p><a href="https://example.com">id</a></p>',
   },
   {
     section: "complex documents",
     name: "mixed document with heading quote list and table",
-    markdown: "# Title\n\n> Intro with **strong** text.\n\n- [x] done\n- [ ] todo\n\n| Name | Value |\n| --- | ---: |\n| A | 1 |\n| B | 2 |",
-    html: "<h1>Title</h1><blockquote><p>Intro with <strong>strong</strong> text.</p></blockquote><ul><li><input type=\"checkbox\" disabled=\"\" checked=\"\" /> done</li><li><input type=\"checkbox\" disabled=\"\" /> todo</li></ul><table><thead><tr><th>Name</th><th align=\"right\">Value</th></tr></thead><tbody><tr><td>A</td><td align=\"right\">1</td></tr><tr><td>B</td><td align=\"right\">2</td></tr></tbody></table>",
+    markdown:
+      "# Title\n\n> Intro with **strong** text.\n\n- [x] done\n- [ ] todo\n\n| Name | Value |\n| --- | ---: |\n| A | 1 |\n| B | 2 |",
+    html: '<h1>Title</h1><blockquote><p>Intro with <strong>strong</strong> text.</p></blockquote><ul><li><input type="checkbox" disabled="" checked="" /> done</li><li><input type="checkbox" disabled="" /> todo</li></ul><table><thead><tr><th>Name</th><th align="right">Value</th></tr></thead><tbody><tr><td>A</td><td align="right">1</td></tr><tr><td>B</td><td align="right">2</td></tr></tbody></table>',
   },
   {
     section: "complex documents",
     name: "inline precedence code beats emphasis and links",
-    markdown: "`**not strong** [not a link](https://example.com)` and **strong**",
+    markdown:
+      "`**not strong** [not a link](https://example.com)` and **strong**",
     html: "<p><code>**not strong** [not a link](https://example.com)</code> and <strong>strong</strong></p>",
   },
   {
     section: "complex documents",
     name: "link destination containing escaped parenthesis",
     markdown: "[link](https://example.com/foo\\)bar)",
-    html: "<p><a href=\"https://example.com/foo)bar\">link</a></p>",
+    html: '<p><a href="https://example.com/foo)bar">link</a></p>',
   },
   {
     section: "complex documents",
     name: "image inside link",
     markdown: "[![alt](image.png)](https://example.com)",
-    html: "<p><a href=\"https://example.com\"><img src=\"image.png\" alt=\"alt\" /></a></p>",
+    html: '<p><a href="https://example.com"><img src="image.png" alt="alt" /></a></p>',
   },
   {
     section: "complex documents",
@@ -1286,13 +1299,13 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "complex documents",
     name: "paragraph with inline image link emphasis and code",
     markdown: "See **our** ![logo](img.png) and `code` [here](https://ex.com).",
-    html: "<p>See <strong>our</strong> <img src=\"img.png\" alt=\"logo\" /> and <code>code</code> <a href=\"https://ex.com\">here</a>.</p>",
+    html: '<p>See <strong>our</strong> <img src="img.png" alt="logo" /> and <code>code</code> <a href="https://ex.com">here</a>.</p>',
   },
   {
     section: "complex documents",
     name: "list with task block quote and nested list",
     markdown: "- [x] task\n  > quote\n  - nested",
-    html: "<ul><li><input type=\"checkbox\" disabled=\"\" checked=\"\" /> task<blockquote><p>quote</p></blockquote><ul><li>nested</li></ul></li></ul>",
+    html: '<ul><li><input type="checkbox" disabled="" checked="" /> task<blockquote><p>quote</p></blockquote><ul><li>nested</li></ul></li></ul>',
   },
   {
     section: "complex documents",
@@ -1303,8 +1316,9 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
   {
     section: "complex documents",
     name: "table with inline emphasis code and link in cells",
-    markdown: "| **A** | `B` | [C](https://ex.com) |\n| --- | --- | --- |\n| **1** | `2` | [3](https://ex.com) |",
-    html: "<table><thead><tr><th><strong>A</strong></th><th><code>B</code></th><th><a href=\"https://ex.com\">C</a></th></tr></thead><tbody><tr><td><strong>1</strong></td><td><code>2</code></td><td><a href=\"https://ex.com\">3</a></td></tr></tbody></table>",
+    markdown:
+      "| **A** | `B` | [C](https://ex.com) |\n| --- | --- | --- |\n| **1** | `2` | [3](https://ex.com) |",
+    html: '<table><thead><tr><th><strong>A</strong></th><th><code>B</code></th><th><a href="https://ex.com">C</a></th></tr></thead><tbody><tr><td><strong>1</strong></td><td><code>2</code></td><td><a href="https://ex.com">3</a></td></tr></tbody></table>',
   },
   {
     section: "complex documents",
@@ -1322,7 +1336,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "complex documents",
     name: "reference links with images and multiple definitions",
     markdown: "[img][]\n\n![img][]\n\n[img]: https://example.com/pic.png",
-    html: "<p><a href=\"https://example.com/pic.png\">img</a></p><p><img src=\"https://example.com/pic.png\" alt=\"img\" /></p>",
+    html: '<p><a href="https://example.com/pic.png">img</a></p><p><img src="https://example.com/pic.png" alt="img" /></p>',
   },
   {
     section: "complex documents",
@@ -1358,7 +1372,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "complex documents",
     name: "ordered list with reversed numbers",
     markdown: "3. alpha\n2. beta\n1. gamma",
-    html: "<ol start=\"3\"><li>alpha</li><li>beta</li><li>gamma</li></ol>",
+    html: '<ol start="3"><li>alpha</li><li>beta</li><li>gamma</li></ol>',
   },
   {
     section: "complex documents",
@@ -1370,7 +1384,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "complex documents",
     name: "link text contains backslash escapes",
     markdown: "[\\(link\\)](https://example.com)",
-    html: "<p><a href=\"https://example.com\">(link)</a></p>",
+    html: '<p><a href="https://example.com">(link)</a></p>',
   },
   {
     section: "optimistic closing",
@@ -1424,7 +1438,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "optimistic closing",
     name: "unterminated inline link auto-closes paren at end",
     markdown: "[text](url",
-    html: "<p><a href=\"url\">text</a></p>",
+    html: '<p><a href="url">text</a></p>',
   },
   {
     section: "optimistic closing",
@@ -1436,25 +1450,25 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "optimistic closing",
     name: "unterminated link bracket before open paren auto-closes",
     markdown: "[text](",
-    html: "<p><a href=\"\">text</a></p>",
+    html: '<p><a href="">text</a></p>',
   },
   {
     section: "optimistic closing",
     name: "unterminated inline image auto-closes paren at end",
     markdown: "![alt](url",
-    html: "<p><img src=\"url\" alt=\"alt\" /></p>",
+    html: '<p><img src="url" alt="alt" /></p>',
   },
   {
     section: "optimistic closing",
     name: "unterminated angle bracket autolink auto-closes at end",
     markdown: "<https://github.com",
-    html: "<p><a href=\"https://github.com\">https://github.com</a></p>",
+    html: '<p><a href="https://github.com">https://github.com</a></p>',
   },
   {
     section: "optimistic closing",
     name: "unterminated angle bracket email auto-closes at end",
     markdown: "<user@example.com",
-    html: "<p><a href=\"mailto:user@example.com\">user@example.com</a></p>",
+    html: '<p><a href="mailto:user@example.com">user@example.com</a></p>',
   },
   {
     section: "optimistic closing",
@@ -1484,13 +1498,13 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "optimistic closing",
     name: "unterminated link with emphasis in text auto-closes",
     markdown: "[*em](url",
-    html: "<p><a href=\"url\"><em>em</em></a></p>",
+    html: '<p><a href="url"><em>em</em></a></p>',
   },
   {
     section: "optimistic closing",
     name: "unterminated emphasis surrounding link auto-closes",
     markdown: "*em [text](url",
-    html: "<p><em>em <a href=\"url\">text</a></em></p>",
+    html: '<p><em>em <a href="url">text</a></em></p>',
   },
   {
     section: "optimistic closing",
@@ -1573,26 +1587,26 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
   {
     section: "optimistic closing",
     name: "unterminated link with title auto-closes paren and title quote",
-    markdown: "[text](url \"title",
-    html: "<p><a href=\"url\" title=\"title\">text</a></p>",
+    markdown: '[text](url "title',
+    html: '<p><a href="url" title="title">text</a></p>',
   },
   {
     section: "optimistic closing",
     name: "unterminated link with single-quote title auto-closes",
     markdown: "[text](url 'title",
-    html: "<p><a href=\"url\" title=\"title\">text</a></p>",
+    html: '<p><a href="url" title="title">text</a></p>',
   },
   {
     section: "optimistic closing",
     name: "unterminated link with parenthesized title auto-closes",
     markdown: "[text](url (title",
-    html: "<p><a href=\"url\" title=\"title\">text</a></p>",
+    html: '<p><a href="url" title="title">text</a></p>',
   },
   {
     section: "optimistic closing",
     name: "unterminated image with title auto-closes",
-    markdown: "![alt](url \"title",
-    html: "<p><img src=\"url\" alt=\"alt\" title=\"title\" /></p>",
+    markdown: '![alt](url "title',
+    html: '<p><img src="url" alt="alt" title="title" /></p>',
   },
   {
     section: "optimistic closing",
@@ -1610,13 +1624,13 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "optimistic closing",
     name: "unterminated strong in link text auto-closes",
     markdown: "[**strong](url",
-    html: "<p><a href=\"url\"><strong>strong</strong></a></p>",
+    html: '<p><a href="url"><strong>strong</strong></a></p>',
   },
   {
     section: "optimistic closing",
     name: "unterminated code span in link text auto-closes",
     markdown: "[`code](url",
-    html: "<p><a href=\"url\"><code>code</code></a></p>",
+    html: '<p><a href="url"><code>code</code></a></p>',
   },
   {
     section: "optimistic closing",
@@ -1628,19 +1642,19 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "optimistic closing",
     name: "unterminated gfm autolink at end of paragraph auto-closes",
     markdown: "Visit https://github.com",
-    html: "<p>Visit <a href=\"https://github.com\">https://github.com</a></p>",
+    html: '<p>Visit <a href="https://github.com">https://github.com</a></p>',
   },
   {
     section: "optimistic closing",
     name: "unterminated gfm email autolink at end auto-closes",
     markdown: "Email user@example.com",
-    html: "<p>Email <a href=\"mailto:user@example.com\">user@example.com</a></p>",
+    html: '<p>Email <a href="mailto:user@example.com">user@example.com</a></p>',
   },
   {
     section: "optimistic closing",
     name: "unterminated www autolink at end auto-closes",
     markdown: "Visit www.github.com",
-    html: "<p>Visit <a href=\"http://www.github.com\">www.github.com</a></p>",
+    html: '<p>Visit <a href="http://www.github.com">www.github.com</a></p>',
   },
   {
     section: "optimistic closing",
@@ -1776,40 +1790,40 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "links",
     name: "reference link with internal whitespace in definition label",
     markdown: "[alpha][  beta  ]\n\n[beta]: https://example.com",
-    html: "<p><a href=\"https://example.com\">alpha</a></p>",
+    html: '<p><a href="https://example.com">alpha</a></p>',
   },
   {
     section: "links",
     name: "link with empty text and empty destination",
     markdown: "[]()",
-    html: "<p><a href=\"\"></a></p>",
+    html: '<p><a href=""></a></p>',
   },
   // --- Edge cases: images ---
   {
     section: "images",
     name: "image with reference and title",
-    markdown: "![alt][img]\n\n[img]: https://example.com/pic.png \"title\"",
-    html: "<p><img src=\"https://example.com/pic.png\" alt=\"alt\" title=\"title\" /></p>",
+    markdown: '![alt][img]\n\n[img]: https://example.com/pic.png "title"',
+    html: '<p><img src="https://example.com/pic.png" alt="alt" title="title" /></p>',
   },
   // --- Edge cases: autolinks ---
   {
     section: "autolinks",
     name: "www autolink trailing slash is included",
     markdown: "Visit www.example.com/ now.",
-    html: "<p>Visit <a href=\"http://www.example.com/\">www.example.com/</a> now.</p>",
+    html: '<p>Visit <a href="http://www.example.com/">www.example.com/</a> now.</p>',
   },
   {
     section: "autolinks",
     name: "url autolink with balanced parentheses",
     markdown: "Visit https://en.wikipedia.org/wiki/C_(programming_language).",
-    html: "<p>Visit <a href=\"https://en.wikipedia.org/wiki/C_(programming_language)\">https://en.wikipedia.org/wiki/C_(programming_language)</a>.</p>",
+    html: '<p>Visit <a href="https://en.wikipedia.org/wiki/C_(programming_language)">https://en.wikipedia.org/wiki/C_(programming_language)</a>.</p>',
   },
   // --- Edge cases: lists ---
   {
     section: "lists",
     name: "ordered list starting at zero",
     markdown: "0. zero\n1. one",
-    html: "<ol start=\"0\"><li>zero</li><li>one</li></ol>",
+    html: '<ol start="0"><li>zero</li><li>one</li></ol>',
   },
   {
     section: "lists",
@@ -1833,7 +1847,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "lists",
     name: "list item containing only task checkbox",
     markdown: "- [x]",
-    html: "<ul><li><input type=\"checkbox\" disabled=\"\" checked=\"\" /></li></ul>",
+    html: '<ul><li><input type="checkbox" disabled="" checked="" /></li></ul>',
   },
   {
     section: "lists",
@@ -1884,7 +1898,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "code blocks",
     name: "tilde fenced code block with info string",
     markdown: "~~~ts\ncode\n~~~",
-    html: "<pre><code class=\"language-ts\">code\n</code></pre>",
+    html: '<pre><code class="language-ts">code\n</code></pre>',
   },
   {
     section: "code blocks",
@@ -1908,7 +1922,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
   {
     section: "html",
     name: "html span nested inside emphasis is escaped",
-    markdown: "*<span class=\"x\">text</span>*",
+    markdown: '*<span class="x">text</span>*',
     html: "<p><em>&lt;span class=&quot;x&quot;&gt;text&lt;/span&gt;</em></p>",
   },
   // --- Edge cases: complex documents ---
@@ -1928,7 +1942,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "complex documents",
     name: "reference definitions separated by blank lines are still collected",
     markdown: "[a]: https://a.com\n\n[b]: https://b.com\n\n[a][b]",
-    html: "<p><a href=\"https://b.com\">a</a></p>",
+    html: '<p><a href="https://b.com">a</a></p>',
   },
   {
     section: "complex documents",
@@ -1946,7 +1960,7 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "complex documents",
     name: "ordered list with mixed paren and dot delimiters",
     markdown: "1. dot\n2) paren",
-    html: "<ol><li>dot</li></ol><ol start=\"2\"><li>paren</li></ol>",
+    html: '<ol><li>dot</li></ol><ol start="2"><li>paren</li></ol>',
   },
   // --- Edge cases: optimistic closing ---
   {
@@ -1965,13 +1979,13 @@ export const gfmRenderingCases: GfmRenderingCase[] = [
     section: "optimistic closing",
     name: "unterminated emphasis inside unterminated link auto-closes both",
     markdown: "[*em](url",
-    html: "<p><a href=\"url\"><em>em</em></a></p>",
+    html: '<p><a href="url"><em>em</em></a></p>',
   },
   {
     section: "optimistic closing",
     name: "unterminated angle bracket autolink consumes rest of paragraph",
     markdown: "<https://example.com rest",
-    html: "<p><a href=\"https://example.com rest\">https://example.com rest</a></p>",
+    html: '<p><a href="https://example.com rest">https://example.com rest</a></p>',
   },
   {
     section: "optimistic closing",
@@ -2346,31 +2360,60 @@ describe("GetDown GFM rendering", () => {
 describe("GetDown renderer overrides", () => {
   test("allows link and bold components to be replaced", () => {
     function AppLink({ href, title, children }: GetDownLinkProps) {
-      return <a className="app-link" href={href} title={title} target="_blank" rel="noopener noreferrer">{children}</a>;
+      return (
+        <a
+          className="app-link"
+          href={href}
+          title={title}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {children}
+        </a>
+      );
     }
 
     function AppBold({ children }: GetDownBoldProps) {
       return <b className="app-bold">{children}</b>;
     }
 
-    expect(renderWithProps({ content: "**Read** [docs](https://example.com)", onLinkComponent: AppLink, onBoldComponent: AppBold })).toBe(
-      "<p><b class=\"app-bold\">Read</b> <a class=\"app-link\" href=\"https://example.com\" target=\"_blank\" rel=\"noopener noreferrer\">docs</a></p>",
+    expect(
+      renderWithProps({
+        content: "**Read** [docs](https://example.com)",
+        onLinkComponent: AppLink,
+        onBoldComponent: AppBold,
+      }),
+    ).toBe(
+      '<p><b class="app-bold">Read</b> <a class="app-link" href="https://example.com" target="_blank" rel="noopener noreferrer">docs</a></p>',
     );
   });
 
   test("allows inline code to be replaced", () => {
     function InlineCode({ value }: GetDownInlineCodeProps) {
-      return <code className="app-inline-code" data-code={value}>{value}</code>;
+      return (
+        <code className="app-inline-code" data-code={value}>
+          {value}
+        </code>
+      );
     }
 
-    expect(renderWithProps({ content: "Use `getdown`.", onInlineCodeComponent: InlineCode })).toBe(
-      "<p>Use <code class=\"app-inline-code\" data-code=\"getdown\">getdown</code>.</p>",
+    expect(
+      renderWithProps({
+        content: "Use `getdown`.",
+        onInlineCodeComponent: InlineCode,
+      }),
+    ).toBe(
+      '<p>Use <code class="app-inline-code" data-code="getdown">getdown</code>.</p>',
     );
   });
 
   test("allows code blocks and table pieces to be replaced", () => {
     function CodeBlock({ code, language }: GetDownCodeBlockProps) {
-      return <pre className="app-code" data-language={language}><code>{code}</code></pre>;
+      return (
+        <pre className="app-code" data-language={language}>
+          <code>{code}</code>
+        </pre>
+      );
     }
 
     function Table({ children }: GetDownTableProps) {
@@ -2378,28 +2421,41 @@ describe("GetDown renderer overrides", () => {
     }
 
     function TableCell({ align, children }: GetDownTableCellProps) {
-      return <td className="app-cell" data-align={align}>{children}</td>;
+      return (
+        <td className="app-cell" data-align={align}>
+          {children}
+        </td>
+      );
     }
 
-    expect(renderWithProps({
-      content: "```ts\nconst x = 1;\n```\n\n| A | B |\n| - | -: |\n| 1 | 2 |",
-      onCodeBlockComponent: CodeBlock,
-      onTableComponent: Table,
-      onTableCellComponent: TableCell,
-    })).toBe(
-      "<pre class=\"app-code\" data-language=\"ts\"><code>const x = 1;\n</code></pre><table class=\"app-table\"><thead><tr><th>A</th><th align=\"right\">B</th></tr></thead><tbody><tr><td class=\"app-cell\">1</td><td class=\"app-cell\" data-align=\"right\">2</td></tr></tbody></table>",
+    expect(
+      renderWithProps({
+        content: "```ts\nconst x = 1;\n```\n\n| A | B |\n| - | -: |\n| 1 | 2 |",
+        onCodeBlockComponent: CodeBlock,
+        onTableComponent: Table,
+        onTableCellComponent: TableCell,
+      }),
+    ).toBe(
+      '<pre class="app-code" data-language="ts"><code>const x = 1;\n</code></pre><table class="app-table"><thead><tr><th>A</th><th align="right">B</th></tr></thead><tbody><tr><td class="app-cell">1</td><td class="app-cell" data-align="right">2</td></tr></tbody></table>',
     );
   });
 
   test("filters unsafe link and image urls by default", () => {
-    expect(render("[x](javascript:alert) ![alt](data:text/html,x)")).toBe("<p><a>x</a> <img alt=\"alt\" /></p>");
+    expect(render("[x](javascript:alert) ![alt](data:text/html,x)")).toBe(
+      '<p><a>x</a> <img alt="alt" /></p>',
+    );
   });
 
   test("allows app-specific url sanitizers", () => {
-    expect(renderWithProps({
-      content: "[x](app://thread/1) ![alt](cid:image-1)",
-      onSanitizeLinkHref: (href) => href.startsWith("app://") ? href : undefined,
-      onSanitizeImageSrc: (src) => src.startsWith("cid:") ? src : undefined,
-    })).toBe("<p><a href=\"app://thread/1\">x</a> <img src=\"cid:image-1\" alt=\"alt\" /></p>");
+    expect(
+      renderWithProps({
+        content: "[x](app://thread/1) ![alt](cid:image-1)",
+        onSanitizeLinkHref: (href) =>
+          href.startsWith("app://") ? href : undefined,
+        onSanitizeImageSrc: (src) => (src.startsWith("cid:") ? src : undefined),
+      }),
+    ).toBe(
+      '<p><a href="app://thread/1">x</a> <img src="cid:image-1" alt="alt" /></p>',
+    );
   });
 });

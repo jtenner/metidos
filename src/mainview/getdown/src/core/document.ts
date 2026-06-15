@@ -10,7 +10,12 @@ import type {
   TableCell,
   ThematicBreakBlock,
 } from "./ast";
-import { hasUnclosedCodeSpan, normalizeReferenceLabel, parseInlines, type LinkReferenceDefinition } from "./inlines";
+import {
+  hasUnclosedCodeSpan,
+  normalizeReferenceLabel,
+  parseInlines,
+  type LinkReferenceDefinition,
+} from "./inlines";
 
 interface SourceLine {
   readonly text: string;
@@ -29,7 +34,10 @@ type LinkReferenceDefinitions = ReadonlyMap<string, LinkReferenceDefinition>;
 const emptyLinkReferenceDefinitions: LinkReferenceDefinitions = new Map();
 const MAX_BLOCKQUOTE_NESTING = 256;
 
-export function parseDocument(content: string, previous?: ParsedDocument | null): ParsedDocument {
+export function parseDocument(
+  content: string,
+  previous?: ParsedDocument | null,
+): ParsedDocument {
   return parseDocumentInternal(content, previous, 0);
 }
 
@@ -43,8 +51,11 @@ function parseDocumentInternal(
 
   const reuse = previous ? buildReuseIndex(previous) : null;
   const lines = splitLines(normalized);
-  const references = normalized.includes("]:") ? collectLinkReferenceDefinitions(lines) : emptyLinkReferenceDefinitions;
-  const mayHaveReferenceDefinitions = references !== emptyLinkReferenceDefinitions;
+  const references = normalized.includes("]:")
+    ? collectLinkReferenceDefinitions(lines)
+    : emptyLinkReferenceDefinitions;
+  const mayHaveReferenceDefinitions =
+    references !== emptyLinkReferenceDefinitions;
   const blocks: MarkdownBlockNode[] = [];
 
   let lineIndex = 0;
@@ -55,12 +66,20 @@ function parseDocumentInternal(
       continue;
     }
 
-    if (mayHaveReferenceDefinitions && parseLinkReferenceDefinitionLine(line.text)) {
+    if (
+      mayHaveReferenceDefinitions &&
+      parseLinkReferenceDefinitionLine(line.text)
+    ) {
       lineIndex += 1;
       continue;
     }
 
-    const blockQuote = parseBlockQuote(lines, lineIndex, reuse, blockquoteNestingDepth);
+    const blockQuote = parseBlockQuote(
+      lines,
+      lineIndex,
+      reuse,
+      blockquoteNestingDepth,
+    );
     if (blockQuote) {
       blocks.push(blockQuote.block);
       lineIndex = blockQuote.nextLine;
@@ -153,20 +172,33 @@ function parseBlockQuote(
     break;
   }
 
-  const sequential = consumeSequentialReusableBlockFromLines<BlockQuoteBlock>("blockquote", lines[startLine]!.start, lines, startLine, nextLine, reuse);
+  const sequential = consumeSequentialReusableBlockFromLines<BlockQuoteBlock>(
+    "blockquote",
+    lines[startLine]!.start,
+    lines,
+    startLine,
+    nextLine,
+    reuse,
+  );
   if (sequential) return { block: sequential, nextLine };
   const raw = sourceSlice(lines, startLine, nextLine);
-  const reusable = consumeReusableBlock<BlockQuoteBlock>("blockquote", lines[startLine]!.start, raw, reuse);
+  const reusable = consumeReusableBlock<BlockQuoteBlock>(
+    "blockquote",
+    lines[startLine]!.start,
+    raw,
+    reuse,
+  );
   if (reusable) return { block: reusable, nextLine };
   const childContent = parts.join("\n").trim() === "" ? "" : parts.join("\n");
   const childBlocks =
     blockquoteNestingDepth >= MAX_BLOCKQUOTE_NESTING
-      ? parseCappedBlockQuoteChildren(childContent, lines[startLine]!.start, raw)
-      : parseDocumentInternal(
+      ? parseCappedBlockQuoteChildren(
           childContent,
-          null,
-          blockquoteNestingDepth + 1,
-        ).blocks;
+          lines[startLine]!.start,
+          raw,
+        )
+      : parseDocumentInternal(childContent, null, blockquoteNestingDepth + 1)
+          .blocks;
   const block: BlockQuoteBlock = {
     id: blockId("blockquote", lines[startLine]!.start, raw),
     kind: "blockquote",
@@ -246,10 +278,22 @@ function parseFencedCode(
   }
 
   const rawEndLine = closed ? nextLine : lines.length;
-  const sequential = consumeSequentialReusableBlockFromLines<CodeBlock>("code", first.start, lines, startLine, rawEndLine, reuse);
+  const sequential = consumeSequentialReusableBlockFromLines<CodeBlock>(
+    "code",
+    first.start,
+    lines,
+    startLine,
+    rawEndLine,
+    reuse,
+  );
   if (sequential) return { block: sequential, nextLine };
   const raw = sourceSlice(lines, startLine, rawEndLine);
-  const reusable = consumeReusableBlock<CodeBlock>("code", first.start, raw, reuse);
+  const reusable = consumeReusableBlock<CodeBlock>(
+    "code",
+    first.start,
+    raw,
+    reuse,
+  );
   if (reusable) return { block: reusable, nextLine };
   const language = info === "" ? undefined : info.split(/\s+/)[0];
   const text = parts.length === 0 ? "" : `${parts.join("\n")}\n`;
@@ -265,14 +309,17 @@ function parseFencedCode(
   return { block: reuseBlock(block, reuse), nextLine };
 }
 
-function collectLinkReferenceDefinitions(lines: readonly SourceLine[]): LinkReferenceDefinitions {
+function collectLinkReferenceDefinitions(
+  lines: readonly SourceLine[],
+): LinkReferenceDefinitions {
   const definitions = new Map<string, LinkReferenceDefinition>();
   for (const line of lines) {
     if (!line.text.includes("]:")) continue;
     const parsed = parseLinkReferenceDefinitionLine(line.text);
     if (!parsed) continue;
     const label = normalizeReferenceLabel(parsed.label);
-    if (label && !definitions.has(label)) definitions.set(label, parsed.definition);
+    if (label && !definitions.has(label))
+      definitions.set(label, parsed.definition);
   }
   return definitions;
 }
@@ -286,7 +333,9 @@ function parseLinkReferenceDefinitionLine(
   return body ? { label: match[1]!, definition: body } : null;
 }
 
-function parseLinkReferenceDefinitionBody(body: string): LinkReferenceDefinition | null {
+function parseLinkReferenceDefinitionBody(
+  body: string,
+): LinkReferenceDefinition | null {
   const trimmed = body.trim();
   if (trimmed === "") return null;
 
@@ -337,14 +386,33 @@ function parseIndentedCode(
     nextLine += 1;
   }
 
-  const sequential = consumeSequentialReusableBlockFromLines<CodeBlock>("code", first.start, lines, startLine, nextLine, reuse);
+  const sequential = consumeSequentialReusableBlockFromLines<CodeBlock>(
+    "code",
+    first.start,
+    lines,
+    startLine,
+    nextLine,
+    reuse,
+  );
   if (sequential) return { block: sequential, nextLine };
   const raw = sourceSlice(lines, startLine, nextLine);
-  const reusable = consumeReusableBlock<CodeBlock>("code", first.start, raw, reuse);
+  const reusable = consumeReusableBlock<CodeBlock>(
+    "code",
+    first.start,
+    raw,
+    reuse,
+  );
   if (reusable) return { block: reusable, nextLine };
   const text = trimTrailingBlankCodeLines(parts).join("\n") + "\n";
   const id = blockId("code", first.start, raw);
-  const block: CodeBlock = { id, kind: "code", raw, start: first.start, end, text };
+  const block: CodeBlock = {
+    id,
+    kind: "code",
+    raw,
+    start: first.start,
+    end,
+    text,
+  };
   return { block: reuseBlock(block, reuse), nextLine };
 }
 
@@ -382,10 +450,20 @@ function parseListAt(
   const firstMarker = parseListMarker(lines[startLine]!.text);
   if (!firstMarker) return null;
 
-  const reusableList = consumeSequentialReusableBlockPrefix<ListBlock>("list", lines[startLine]!.start, lines, startLine, reuse, (next) =>
-    !next || isBlank(next.text),
+  const reusableList = consumeSequentialReusableBlockPrefix<ListBlock>(
+    "list",
+    lines[startLine]!.start,
+    lines,
+    startLine,
+    reuse,
+    (next) => !next || isBlank(next.text),
   );
-  if (reusableList) return { block: reusableList.block, nextLine: reusableList.nextLine, end: reusableList.block.end };
+  if (reusableList)
+    return {
+      block: reusableList.block,
+      nextLine: reusableList.nextLine,
+      end: reusableList.block.end,
+    };
 
   const items: MutableListItem[] = [];
   let nextLine = startLine;
@@ -398,7 +476,11 @@ function parseListAt(
     const marker = parseListMarker(line.text);
 
     if (marker) {
-      if (isSameListLevel(marker, firstMarker) && marker.ordered === firstMarker.ordered && marker.marker === firstMarker.marker) {
+      if (
+        isSameListLevel(marker, firstMarker) &&
+        marker.ordered === firstMarker.ordered &&
+        marker.marker === firstMarker.marker
+      ) {
         if (pendingBlank) pendingBlank = false;
         items.push(createListItem(marker.text, references));
         end = line.end;
@@ -427,10 +509,18 @@ function parseListAt(
       continue;
     }
 
-    if (!isBlank(line.text) && items.length > 0 && leadingSpaces(line.text) > firstMarker.indent) {
+    if (
+      !isBlank(line.text) &&
+      items.length > 0 &&
+      leadingSpaces(line.text) > firstMarker.indent
+    ) {
       const current = items[items.length - 1]!;
       if (pendingBlank) {
-        const continuationBlock = collectListContinuationBlock(lines, nextLine, firstMarker);
+        const continuationBlock = collectListContinuationBlock(
+          lines,
+          nextLine,
+          firstMarker,
+        );
         const childDocument = parseDocument(continuationBlock.text);
         appendBlocks(current, childDocument.blocks);
         end = continuationBlock.end;
@@ -439,19 +529,31 @@ function parseListAt(
         continue;
       }
 
-      const continuation = stripListContinuationIndent(line.text, firstMarker.indent);
+      const continuation = stripListContinuationIndent(
+        line.text,
+        firstMarker.indent,
+      );
       if (isBlockQuoteLine(continuation)) {
         const childDocument = parseDocument(continuation);
         appendBlocks(current, childDocument.blocks);
-      } else if (isFencedCodeOpener(continuation) || isIndentedCodeLine(continuation)) {
-        const continuationBlock = collectListContinuationBlock(lines, nextLine, firstMarker);
+      } else if (
+        isFencedCodeOpener(continuation) ||
+        isIndentedCodeLine(continuation)
+      ) {
+        const continuationBlock = collectListContinuationBlock(
+          lines,
+          nextLine,
+          firstMarker,
+        );
         const childDocument = parseDocument(continuationBlock.text);
         appendBlocks(current, childDocument.blocks);
         end = continuationBlock.end;
         nextLine = continuationBlock.nextLine;
         continue;
       } else {
-        current.text = current.text ? `${current.text}\n${continuation}` : continuation;
+        current.text = current.text
+          ? `${current.text}\n${continuation}`
+          : continuation;
         current.children = parseInlines(current.text, references);
       }
       end = line.end;
@@ -463,7 +565,12 @@ function parseListAt(
   }
 
   const raw = sourceSlice(lines, startLine, nextLine);
-  const reusable = consumeReusableBlock<ListBlock>("list", lines[startLine]!.start, raw, reuse);
+  const reusable = consumeReusableBlock<ListBlock>(
+    "list",
+    lines[startLine]!.start,
+    raw,
+    reuse,
+  );
   if (reusable) return { block: reusable, nextLine, end };
   const block: ListBlock = {
     id: blockId("list", lines[startLine]!.start, raw),
@@ -473,16 +580,25 @@ function parseListAt(
     end,
     ordered: firstMarker.ordered,
     marker: firstMarker.marker,
-    ...(firstMarker.ordered && firstMarker.number !== 1 ? { startNumber: firstMarker.number } : null),
+    ...(firstMarker.ordered && firstMarker.number !== 1
+      ? { startNumber: firstMarker.number }
+      : null),
     items: items.map((item) => finalizeListItem(item, loose, references)),
   };
   return { block: reuseBlock(block, reuse), nextLine, end };
 }
 
-function createListItem(rawText: string, references: LinkReferenceDefinitions): MutableListItem {
+function createListItem(
+  rawText: string,
+  references: LinkReferenceDefinitions,
+): MutableListItem {
   const task = parseTaskMarker(rawText);
   const text = task ? task.text : rawText;
-  const heading = parseAtxHeading({ text, start: 0, end: text.length }, null, references);
+  const heading = parseAtxHeading(
+    { text, start: 0, end: text.length },
+    null,
+    references,
+  );
   return {
     text: heading ? "" : text,
     children: heading ? [] : parseInlines(text, references),
@@ -492,12 +608,17 @@ function createListItem(rawText: string, references: LinkReferenceDefinitions): 
 }
 
 function appendBlock(item: MutableListItem, block: MarkdownBlockNode): void {
-  (item.blocks ??= []).push(block);
+  item.blocks ??= [];
+  item.blocks.push(block);
 }
 
-function appendBlocks(item: MutableListItem, blocks: readonly MarkdownBlockNode[]): void {
+function appendBlocks(
+  item: MutableListItem,
+  blocks: readonly MarkdownBlockNode[],
+): void {
   if (blocks.length === 0) return;
-  (item.blocks ??= []).push(...blocks);
+  item.blocks ??= [];
+  item.blocks.push(...blocks);
 }
 
 function finalizeListItem(
@@ -515,7 +636,8 @@ function finalizeListItem(
   }
 
   const blocks: MarkdownBlockNode[] = [];
-  if (item.text.length > 0) blocks.push(createListParagraphBlock(item.text, references));
+  if (item.text.length > 0)
+    blocks.push(createListParagraphBlock(item.text, references));
   blocks.push(...(item.blocks ?? []));
   return {
     text: "",
@@ -525,7 +647,10 @@ function finalizeListItem(
   };
 }
 
-function createListParagraphBlock(text: string, references: LinkReferenceDefinitions): ParagraphBlock {
+function createListParagraphBlock(
+  text: string,
+  references: LinkReferenceDefinitions,
+): ParagraphBlock {
   return {
     id: listParagraphBlockId(text),
     kind: "paragraph",
@@ -537,13 +662,23 @@ function createListParagraphBlock(text: string, references: LinkReferenceDefinit
   };
 }
 
-function blankBelongsToList(lines: readonly SourceLine[], blankLine: number, firstMarker: ParsedListMarker): boolean {
+function blankBelongsToList(
+  lines: readonly SourceLine[],
+  blankLine: number,
+  firstMarker: ParsedListMarker,
+): boolean {
   let nextLine = blankLine + 1;
-  while (nextLine < lines.length && isBlank(lines[nextLine]!.text)) nextLine += 1;
+  while (nextLine < lines.length && isBlank(lines[nextLine]!.text))
+    nextLine += 1;
   const next = lines[nextLine];
   if (!next) return false;
   const marker = parseListMarker(next.text);
-  if (marker && isSameListLevel(marker, firstMarker) && marker.ordered === firstMarker.ordered && marker.marker === firstMarker.marker) {
+  if (
+    marker &&
+    isSameListLevel(marker, firstMarker) &&
+    marker.ordered === firstMarker.ordered &&
+    marker.marker === firstMarker.marker
+  ) {
     return true;
   }
   return leadingSpaces(next.text) > firstMarker.indent;
@@ -562,9 +697,14 @@ function collectListContinuationBlock(
     const line = lines[nextLine]!;
     const marker = parseListMarker(line.text);
     if (marker && isSameListLevel(marker, firstMarker)) break;
-    if (!isBlank(line.text) && leadingSpaces(line.text) <= firstMarker.indent) break;
+    if (!isBlank(line.text) && leadingSpaces(line.text) <= firstMarker.indent)
+      break;
 
-    parts.push(isBlank(line.text) ? "" : stripListContinuationIndent(line.text, firstMarker.indent));
+    parts.push(
+      isBlank(line.text)
+        ? ""
+        : stripListContinuationIndent(line.text, firstMarker.indent),
+    );
     end = line.end;
     nextLine += 1;
   }
@@ -572,8 +712,14 @@ function collectListContinuationBlock(
   return { text: parts.join("\n"), nextLine, end };
 }
 
-function isSameListLevel(marker: ParsedListMarker, firstMarker: ParsedListMarker): boolean {
-  return marker.indent >= firstMarker.indent && marker.indent <= firstMarker.indent + 1;
+function isSameListLevel(
+  marker: ParsedListMarker,
+  firstMarker: ParsedListMarker,
+): boolean {
+  return (
+    marker.indent >= firstMarker.indent &&
+    marker.indent <= firstMarker.indent + 1
+  );
 }
 
 function isParagraphInterruptingListLine(line: string): boolean {
@@ -587,7 +733,12 @@ function parseListMarker(line: string): ParsedListMarker | null {
   const unordered = /^( *)([-+*])(?:[ \t]+(.*)|[ \t]*)$/.exec(line);
   if (unordered) {
     if (unordered[2] === "*" && unordered[3] === undefined) return null;
-    return { indent: unordered[1]!.length, ordered: false, marker: unordered[2]!, text: unordered[3] ?? "" };
+    return {
+      indent: unordered[1]!.length,
+      ordered: false,
+      marker: unordered[2]!,
+      text: unordered[3] ?? "",
+    };
   }
 
   const ordered = /^( *)(\d{1,9})([.)])(?:[ \t]+(.*)|[ \t]*)$/.exec(line);
@@ -614,7 +765,9 @@ function stripListContinuationIndent(line: string, listIndent: number): string {
   return line.slice(Math.min(line.length, listIndent + 2));
 }
 
-function parseTaskMarker(text: string): { checked: boolean; text: string } | null {
+function parseTaskMarker(
+  text: string,
+): { checked: boolean; text: string } | null {
   const match = /^\[([ xX])\](?: (.*)|$)/.exec(text);
   if (!match) return null;
   return { checked: match[1]!.toLowerCase() === "x", text: match[2] ?? "" };
@@ -628,17 +781,38 @@ function parseTable(
 ): { block: TableBlock; nextLine: number } | null {
   const delimiterLine = lines[startLine + 1];
   if (!delimiterLine) return null;
-  if (!lines[startLine]!.text.includes("|") && !delimiterLine.text.includes("|")) return null;
+  if (
+    !lines[startLine]!.text.includes("|") &&
+    !delimiterLine.text.includes("|")
+  )
+    return null;
 
-  const reusableTable = consumeSequentialReusableBlockPrefix<TableBlock>("table", lines[startLine]!.start, lines, startLine, reuse, (next) =>
-    !next || isBlank(next.text) || !stripUpToThreeSpaces(next.text).includes("|"),
+  const reusableTable = consumeSequentialReusableBlockPrefix<TableBlock>(
+    "table",
+    lines[startLine]!.start,
+    lines,
+    startLine,
+    reuse,
+    (next) =>
+      !next ||
+      isBlank(next.text) ||
+      !stripUpToThreeSpaces(next.text).includes("|"),
   );
-  if (reusableTable) return { block: reusableTable.block, nextLine: reusableTable.nextLine };
+  if (reusableTable)
+    return { block: reusableTable.block, nextLine: reusableTable.nextLine };
 
-  const headerTexts = splitTableRow(stripUpToThreeSpaces(lines[startLine]!.text));
-  const delimiterCells = splitTableRow(stripUpToThreeSpaces(delimiterLine.text));
+  const headerTexts = splitTableRow(
+    stripUpToThreeSpaces(lines[startLine]!.text),
+  );
+  const delimiterCells = splitTableRow(
+    stripUpToThreeSpaces(delimiterLine.text),
+  );
   const alignments = delimiterCells.map(parseTableAlignment);
-  if (headerTexts.length === 0 || delimiterCells.length === 0 || alignments.some((alignment) => alignment === undefined)) {
+  if (
+    headerTexts.length === 0 ||
+    delimiterCells.length === 0 ||
+    alignments.some((alignment) => alignment === undefined)
+  ) {
     return null;
   }
 
@@ -651,13 +825,20 @@ function parseTable(
     const line = lines[nextLine]!;
     const text = stripUpToThreeSpaces(line.text);
     if (isBlank(text) || !text.includes("|")) break;
-    rows.push(normalizeTableCells(splitTableRow(text), columnCount, references));
+    rows.push(
+      normalizeTableCells(splitTableRow(text), columnCount, references),
+    );
     end = line.end;
     nextLine += 1;
   }
 
   const raw = sourceSlice(lines, startLine, nextLine);
-  const reusable = consumeReusableBlock<TableBlock>("table", lines[startLine]!.start, raw, reuse);
+  const reusable = consumeReusableBlock<TableBlock>(
+    "table",
+    lines[startLine]!.start,
+    raw,
+    reuse,
+  );
   if (reusable) return { block: reusable, nextLine };
   const block: TableBlock = {
     id: blockId("table", lines[startLine]!.start, raw),
@@ -665,7 +846,10 @@ function parseTable(
     raw,
     start: lines[startLine]!.start,
     end,
-    alignments: Array.from({ length: columnCount }, (_, index) => alignments[index] ?? null),
+    alignments: Array.from(
+      { length: columnCount },
+      (_, index) => alignments[index] ?? null,
+    ),
     header: normalizeTableCells(headerTexts, columnCount, references),
     rows,
   };
@@ -675,7 +859,10 @@ function parseTable(
 function splitTableRow(line: string): string[] {
   const trimmed = line.trim();
   const source = trimmed.startsWith("|") ? trimmed.slice(1) : trimmed;
-  const withoutTrailingPipe = source.endsWith("|") && !source.endsWith("\\|") ? source.slice(0, -1) : source;
+  const withoutTrailingPipe =
+    source.endsWith("|") && !source.endsWith("\\|")
+      ? source.slice(0, -1)
+      : source;
   const cells: string[] = [];
   let cell = "";
   let escaped = false;
@@ -702,7 +889,9 @@ function splitTableRow(line: string): string[] {
   return cells;
 }
 
-function parseTableAlignment(cell: string): TableBlock["alignments"][number] | undefined {
+function parseTableAlignment(
+  cell: string,
+): TableBlock["alignments"][number] | undefined {
   const normalized = cell.trim();
   if (!/^:?-+:?$/.test(normalized)) return undefined;
   const left = normalized.startsWith(":");
@@ -736,7 +925,12 @@ function parseAtxHeading(
 
   const level = match[2]!.length as HeadingBlock["level"];
   const raw = line.text;
-  const reusable = consumeReusableBlock<HeadingBlock>("heading", line.start, raw, reuse);
+  const reusable = consumeReusableBlock<HeadingBlock>(
+    "heading",
+    line.start,
+    raw,
+    reuse,
+  );
   if (reusable) return reusable;
   const body = match[3]!.replace(/[ \t]+#+[ \t]*$/, "").trim();
   const id = blockId("heading", line.start, raw);
@@ -776,14 +970,29 @@ function isThematicBreakLine(line: string): boolean {
     }
     if (char !== " " && char !== "\t") return false;
   }
-  return count >= 3 && !(count === 4 && line.slice(skipUpToThreeSpacesIndex(line)).trim().length === 4 && marker !== "-");
+  return (
+    count >= 3 &&
+    !(
+      count === 4 &&
+      line.slice(skipUpToThreeSpacesIndex(line)).trim().length === 4 &&
+      marker !== "-"
+    )
+  );
 }
 
-function parseThematicBreak(line: SourceLine, reuse: ReuseIndex | null): ThematicBreakBlock | null {
+function parseThematicBreak(
+  line: SourceLine,
+  reuse: ReuseIndex | null,
+): ThematicBreakBlock | null {
   if (!isThematicBreakLine(line.text)) return null;
 
   const raw = line.text;
-  const reusable = consumeReusableBlock<ThematicBreakBlock>("thematicBreak", line.start, raw, reuse);
+  const reusable = consumeReusableBlock<ThematicBreakBlock>(
+    "thematicBreak",
+    line.start,
+    raw,
+    reuse,
+  );
   if (reusable) return reusable;
   const block: ThematicBreakBlock = {
     id: blockId("thematicBreak", line.start, raw),
@@ -809,7 +1018,11 @@ function parseParagraph(
   while (nextLine < lines.length) {
     const line = lines[nextLine]!;
     if (isBlank(line.text)) {
-      if (sawBacktick && parts.length > 0 && hasUnclosedCodeSpan(parts.join("\n"))) {
+      if (
+        sawBacktick &&
+        parts.length > 0 &&
+        hasUnclosedCodeSpan(parts.join("\n"))
+      ) {
         parts.push("");
         end = line.end;
         nextLine += 1;
@@ -839,10 +1052,22 @@ function parseParagraph(
   if (parts.length === 1 && nextLine < lines.length) {
     const delimiter = parseSetextDelimiter(lines[nextLine]!.text);
     if (delimiter) {
-      const sequential = consumeSequentialReusableBlockFromLines<HeadingBlock>("heading", lines[startLine]!.start, lines, startLine, nextLine + 1, reuse);
+      const sequential = consumeSequentialReusableBlockFromLines<HeadingBlock>(
+        "heading",
+        lines[startLine]!.start,
+        lines,
+        startLine,
+        nextLine + 1,
+        reuse,
+      );
       if (sequential) return { block: sequential, nextLine: nextLine + 1 };
       const raw = sourceSlice(lines, startLine, nextLine + 1);
-      const reusable = consumeReusableBlock<HeadingBlock>("heading", lines[startLine]!.start, raw, reuse);
+      const reusable = consumeReusableBlock<HeadingBlock>(
+        "heading",
+        lines[startLine]!.start,
+        raw,
+        reuse,
+      );
       if (reusable) return { block: reusable, nextLine: nextLine + 1 };
       const text = parts[0]!.trim();
       const block: HeadingBlock = {
@@ -862,10 +1087,22 @@ function parseParagraph(
   const text = normalizeParagraphText(parts.join("\n"));
   if (text.length === 0) return null;
 
-  const sequential = consumeSequentialReusableBlockFromLines<ParagraphBlock>("paragraph", lines[startLine]!.start, lines, startLine, nextLine, reuse);
+  const sequential = consumeSequentialReusableBlockFromLines<ParagraphBlock>(
+    "paragraph",
+    lines[startLine]!.start,
+    lines,
+    startLine,
+    nextLine,
+    reuse,
+  );
   if (sequential) return { block: sequential, nextLine };
   const raw = sourceSlice(lines, startLine, nextLine);
-  const reusable = consumeReusableBlock<ParagraphBlock>("paragraph", lines[startLine]!.start, raw, reuse);
+  const reusable = consumeReusableBlock<ParagraphBlock>(
+    "paragraph",
+    lines[startLine]!.start,
+    raw,
+    reuse,
+  );
   if (reusable) return { block: reusable, nextLine };
   const block: ParagraphBlock = {
     id: blockId("paragraph", lines[startLine]!.start, raw),
@@ -892,20 +1129,28 @@ function parseSetextDelimiter(line: string): HeadingBlock["level"] | null {
 
 function normalizeParagraphText(text: string): string {
   const leadingTrimmed = text.replace(/^[ \t]+/, "");
-  if (hasTrailingHardBreakBackslash(leadingTrimmed)) return `${leadingTrimmed.replace(/[ \t]*$/, "")}\n`;
-  if (/ {2,}$/.test(leadingTrimmed)) return leadingTrimmed.replace(/ {2,}$/, "  \n");
+  if (hasTrailingHardBreakBackslash(leadingTrimmed))
+    return `${leadingTrimmed.replace(/[ \t]*$/, "")}\n`;
+  if (/ {2,}$/.test(leadingTrimmed))
+    return leadingTrimmed.replace(/ {2,}$/, "  \n");
   return leadingTrimmed.trimEnd();
 }
 
 function hasTrailingHardBreakBackslash(text: string): boolean {
   const trimmed = text.replace(/[ \t]*$/, "");
   let count = 0;
-  for (let index = trimmed.length - 1; index >= 0 && trimmed[index] === "\\"; index -= 1) count += 1;
+  for (
+    let index = trimmed.length - 1;
+    index >= 0 && trimmed[index] === "\\";
+    index -= 1
+  )
+    count += 1;
   return count % 2 === 1;
 }
 
 function normalizeSource(content: string): string {
-  if (content.indexOf("\r") === -1 && content.indexOf("\0") === -1) return content;
+  if (content.indexOf("\r") === -1 && content.indexOf("\0") === -1)
+    return content;
   return content.replace(/\r\n?/g, "\n").replace(/\0/g, "�");
 }
 
@@ -923,9 +1168,14 @@ function splitLines(source: string): SourceLine[] {
   return lines;
 }
 
-function sourceSlice(lines: readonly SourceLine[], startLine: number, endLine: number): string {
+function sourceSlice(
+  lines: readonly SourceLine[],
+  startLine: number,
+  endLine: number,
+): string {
   let raw = lines[startLine]?.text ?? "";
-  for (let index = startLine + 1; index < endLine; index += 1) raw += `\n${lines[index]!.text}`;
+  for (let index = startLine + 1; index < endLine; index += 1)
+    raw += `\n${lines[index]!.text}`;
   return raw;
 }
 
@@ -958,7 +1208,11 @@ function isFencedCodeOpener(line: string): boolean {
   return line[index + 1] === marker && line[index + 2] === marker;
 }
 
-function isClosingCodeFence(line: string, fence: string, minimumLength: number): boolean {
+function isClosingCodeFence(
+  line: string,
+  fence: string,
+  minimumLength: number,
+): boolean {
   let index = skipUpToThreeSpacesIndex(line);
   let length = 0;
   while (line[index] === fence) {
@@ -991,7 +1245,11 @@ function trimTrailingBlankCodeLines(lines: string[]): string[] {
   return lines.slice(0, end);
 }
 
-function blockId(kind: MarkdownBlockNode["kind"], start: number, raw: string): string {
+function blockId(
+  kind: MarkdownBlockNode["kind"],
+  start: number,
+  raw: string,
+): string {
   void raw;
   return `${kind}:${start}`;
 }
@@ -1012,8 +1270,13 @@ function buildReuseIndex(previous: ParsedDocument): ReuseIndex {
   return { blocks: previous.blocks, cursor: 0 };
 }
 
-function reuseBlock<T extends MarkdownBlockNode>(block: T, reuse: ReuseIndex | null): T {
-  return consumeReusableBlock<T>(block.kind, block.start, block.raw, reuse) ?? block;
+function reuseBlock<T extends MarkdownBlockNode>(
+  block: T,
+  reuse: ReuseIndex | null,
+): T {
+  return (
+    consumeReusableBlock<T>(block.kind, block.start, block.raw, reuse) ?? block
+  );
 }
 
 function consumeSequentialReusableBlockPrefix<T extends MarkdownBlockNode>(
@@ -1030,7 +1293,12 @@ function consumeSequentialReusableBlockPrefix<T extends MarkdownBlockNode>(
 
   const lineCount = countRawLines(block.raw);
   const nextLine = startLine + lineCount;
-  if (nextLine > lines.length || !isBoundary(lines[nextLine]) || !rawEqualsLines(block.raw, lines, startLine, nextLine)) return null;
+  if (
+    nextLine > lines.length ||
+    !isBoundary(lines[nextLine]) ||
+    !rawEqualsLines(block.raw, lines, startLine, nextLine)
+  )
+    return null;
 
   reuse.cursor += 1;
   return { block: block as T, nextLine };
@@ -1046,7 +1314,13 @@ function consumeSequentialReusableBlockFromLines<T extends MarkdownBlockNode>(
 ): T | null {
   if (!reuse || reuse.byFingerprint) return null;
   const block = reuse.blocks[reuse.cursor];
-  if (!block || block.kind !== kind || block.start !== start || !rawEqualsLines(block.raw, lines, startLine, endLine)) return null;
+  if (
+    !block ||
+    block.kind !== kind ||
+    block.start !== start ||
+    !rawEqualsLines(block.raw, lines, startLine, endLine)
+  )
+    return null;
   reuse.cursor += 1;
   return block as T;
 }
@@ -1059,7 +1333,12 @@ function countRawLines(raw: string): number {
   return count;
 }
 
-function rawEqualsLines(raw: string, lines: readonly SourceLine[], startLine: number, endLine: number): boolean {
+function rawEqualsLines(
+  raw: string,
+  lines: readonly SourceLine[],
+  startLine: number,
+  endLine: number,
+): boolean {
   let rawIndex = 0;
   for (let lineIndex = startLine; lineIndex < endLine; lineIndex += 1) {
     if (lineIndex > startLine) {
@@ -1094,12 +1373,17 @@ function consumeReusableBlock<T extends MarkdownBlockNode>(
     }
   }
 
-  const byFingerprint = reuse.byFingerprint ??= buildFallbackReuseMap(reuse.blocks, reuse.cursor);
-  const bucket = byFingerprint.get(blockFingerprintParts(kind, start, raw));
+  reuse.byFingerprint ??= buildFallbackReuseMap(reuse.blocks, reuse.cursor);
+  const bucket = reuse.byFingerprint.get(
+    blockFingerprintParts(kind, start, raw),
+  );
   return (bucket?.shift() as T | undefined) ?? null;
 }
 
-function buildFallbackReuseMap(blocks: readonly MarkdownBlockNode[], start: number): Map<string, MarkdownBlockNode[]> {
+function buildFallbackReuseMap(
+  blocks: readonly MarkdownBlockNode[],
+  start: number,
+): Map<string, MarkdownBlockNode[]> {
   const byFingerprint = new Map<string, MarkdownBlockNode[]>();
   for (let index = start; index < blocks.length; index += 1) {
     const block = blocks[index]!;
@@ -1124,6 +1408,10 @@ function blockFingerprint(block: MarkdownBlockNode): string {
   return blockFingerprintParts(block.kind, block.start, block.raw);
 }
 
-function blockFingerprintParts(kind: MarkdownBlockNode["kind"], start: number, raw: string): string {
+function blockFingerprintParts(
+  kind: MarkdownBlockNode["kind"],
+  start: number,
+  raw: string,
+): string {
   return `${kind}:${raw}`;
 }

@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -233,6 +234,16 @@ test("patched Pi system prompt leaves date injection to Metidos", () => {
   );
   expect(prompt).not.toContain("\nCurrent date:");
   expect(prompt.endsWith("\nCurrent working directory: /repo")).toBe(true);
+
+  for (const artifactPath of [
+    "node_modules/@mariozechner/pi-coding-agent/dist/core/system-prompt.js",
+    "node_modules/@mariozechner/pi-coding-agent/dist/core/system-prompt.js.map",
+    "node_modules/@mariozechner/pi-coding-agent/dist/core/system-prompt.d.ts.map",
+  ]) {
+    const artifact = readFileSync(artifactPath, "utf8");
+    expect(artifact).not.toContain("Current date:");
+    expect(artifact).not.toContain("const now = new Date()");
+  }
 });
 
 test("resolveThreadScopedPath rejects symlink escapes from the worktree", () => {

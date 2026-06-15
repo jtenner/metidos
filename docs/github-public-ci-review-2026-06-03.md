@@ -18,7 +18,7 @@ This note covers the GitHub public repository setup checklist item to confirm th
   - `.github/workflows/codeql.yml`: workflow `CodeQL` runs on all pull requests, pushes to `master`, and a weekly schedule. It declares `actions: read`, `contents: read`, and `security-events: write` permissions for CodeQL upload and does not reference `secrets.*`.
   - `.github/workflows/dependency-review.yml`: workflow `Dependency Review` runs on pull requests that touch dependency manifests, lockfiles, or the workflow itself. It declares `contents: read` and `pull-requests: read` permissions, uses `actions/dependency-review-action@v4`, and does not reference `secrets.*`.
 - Related automation:
-  - `.github/dependabot.yml` enables weekly Bun dependency updates for the root package, `src/mainview/getdown`, and GitHub Actions.
+  - `.github/dependabot.yml` enables weekly Bun dependency updates for the root package and GitHub Actions. GetDown is source-only under `src/mainview/getdown/` and no longer has a nested Bun package update entry.
 
 ## Assessment
 

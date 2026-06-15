@@ -5,7 +5,7 @@ A chat-safe React component API for rendering GitHub Flavored Markdown.
 ## API
 
 ```tsx
-import { GetDown, type GetDownLinkProps } from "getdown";
+import { GetDown, type GetDownLinkProps } from "../getdown";
 
 function AppLink({ href, title, children }: GetDownLinkProps) {
   return (
@@ -28,12 +28,12 @@ Raw HTML is not injected. HTML-like markdown is rendered as escaped text by defa
 
 ## Development
 
-Run these from `src/mainview/getdown/`, where the local `package.json` defines the typecheck and performance scripts:
+Run these from the repository root:
 
 ```bash
-bun test
+bun test src/mainview/getdown
 bun run typecheck
-bun run perf:baseline
+bun run src/mainview/getdown/perf/baseline.tsx
 ```
 
-Performance baselines live in `perf/baseline.tsx`. Use `bun run perf:baseline:save` to write a timestamped JSON snapshot under `perf/baselines/` for comparing streaming parser speed and GC pressure over time.
+Performance baselines live in `perf/baseline.tsx`. Use `bun run src/mainview/getdown/perf/baseline.tsx --save` to write a timestamped JSON snapshot under `perf/baselines/` for comparing streaming parser speed and GC pressure over time.
