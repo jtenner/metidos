@@ -3753,9 +3753,11 @@ export async function setWorktreePinnedProcedure(
     params.worktreePath,
     context,
   );
-  await assertProjectWorktree(project, worktreePath, {
-    forceRefresh: true,
-  });
+  if (params.pinned) {
+    await assertProjectWorktree(project, worktreePath, {
+      forceRefresh: true,
+    });
+  }
 
   setProjectWorktreePinned(db, project.id, worktreePath, params.pinned);
 
