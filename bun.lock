@@ -11,7 +11,7 @@
         "@sinclair/typebox": "^0.34.49",
         "@tanstack/react-virtual": "^3.14.3",
         "@tootallnate/quickjs-emscripten": "0.23.0",
-        "cronstrue": "^3.14.0",
+        "cronstrue": "^3.20.0",
         "ghostty-web": "^0.4.0",
         "ical.js": "^2.2.1",
         "node-gyp": "^13.0.0",
@@ -562,7 +562,7 @@
 
     "convert-source-map": ["convert-source-map@2.0.0", "", {}, "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="],
 
-    "cronstrue": ["cronstrue@3.14.0", "", { "bin": { "cronstrue": "bin/cli.js" } }, "sha512-XnW4vuK/jPJjmTyDWiej1Zq36Od7ITwxaV2O1pzHZuyMVvdy7NAvyvIBzybt+idqSpfqYuoDG7uf/ocGtJVWxA=="],
+    "cronstrue": ["cronstrue@3.20.0", "", { "bin": { "cronstrue": "bin/cli.js" } }, "sha512-2VOOE8DSemXhqEtlU23GBMoeowHnhcto+HPelhtCfM5cP+PB59UOuoeOIBQATzKSW+RfOGF7OJjcwfaUxRW6QQ=="],
 
     "csstype": ["csstype@3.2.3", "", {}, "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="],
 
