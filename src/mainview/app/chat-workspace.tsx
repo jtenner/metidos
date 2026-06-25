@@ -63,6 +63,7 @@ import {
   shouldForcePinChatTranscript,
   shouldNotAdjustScrollPositionOnTranscriptItemSizeChange,
   shouldRepinChatTranscriptOnItemSizeChange,
+  type TranscriptMeasuredItem,
   type TranscriptViewportAnchor,
 } from "./chat-transcript-scroll";
 import { safeLocalStorageSetItem } from "./browser-storage";
@@ -1163,6 +1164,9 @@ const ChatTranscript = memo(function ChatTranscript({
   const previousMeasuredGroupHeightsRef = useRef<Map<string, number>>(
     new Map(),
   );
+  const previousTranscriptMeasurementsRef = useRef<TranscriptMeasuredItem[]>(
+    [],
+  );
   const transcriptVirtualizerRef = useRef<Virtualizer<
     HTMLDivElement,
     HTMLLIElement
@@ -1204,6 +1208,8 @@ const ChatTranscript = memo(function ChatTranscript({
     () => groupedMessages.map((group) => group.key),
     [groupedMessages],
   );
+  const previousGroupedMessageKeysRef =
+    useRef<readonly string[]>(groupedMessageKeys);
   const groupedMessageKeysRef = useRef<readonly string[]>(groupedMessageKeys);
   // ResizeObserver measurements may be delivered after a React render that has
   // already replaced the transcript groups. Keep the latest keys in a ref so
@@ -1598,6 +1604,7 @@ const ChatTranscript = memo(function ChatTranscript({
 
   useEffect(() => {
     previousMeasuredGroupHeightsRef.current.clear();
+    previousTranscriptMeasurementsRef.current = [];
     viewportAnchorRef.current = null;
   }, []);
 
@@ -1680,27 +1687,69 @@ const ChatTranscript = memo(function ChatTranscript({
     previousThreadIdRef.current = activeThreadId;
     previousTailMessageKeyRef.current = tailMessage?.key ?? null;
 
-    if (scrollStateRef.current === "pinned") {
-      scrollToBottom();
-      return;
-    }
-
-    const restoredScrollTop = restoreTranscriptViewportAnchorScrollTop(
-      viewportAnchorRef.current,
-      transcriptVirtualizer.measurementsCache.map((item) => ({
+    const previousGroupedMessageKeys = previousGroupedMessageKeysRef.current;
+    const currentMeasurements = transcriptVirtualizer.measurementsCache.map(
+      (item) => ({
         end: item.end,
         index: item.index,
         key: String(item.key),
         size: item.size,
         start: item.start,
-      })),
+      }),
+    );
+
+    if (scrollStateRef.current === "pinned") {
+      scrollToBottom();
+      previousGroupedMessageKeysRef.current = groupedMessageKeys;
+      previousTranscriptMeasurementsRef.current = currentMeasurements;
+      return;
+    }
+
+    const fallbackAnchor = captureTranscriptViewportAnchor(
+      scrollRef.current?.scrollTop ?? 0,
+      previousTranscriptMeasurementsRef.current,
+    );
+    const anchor = viewportAnchorRef.current ?? fallbackAnchor;
+    const restoredScrollTop = restoreTranscriptViewportAnchorScrollTop(
+      anchor,
+      currentMeasurements,
     );
 
     if (restoredScrollTop !== null) {
+      viewportAnchorRef.current = anchor;
       setProgrammaticScrollTop(restoredScrollTop);
+    } else {
+      const firstRetainedPreviousKey = previousGroupedMessageKeys.find((key) =>
+        groupedMessageKeys.includes(key),
+      );
+      const previousRetainedMeasurement =
+        firstRetainedPreviousKey === undefined
+          ? undefined
+          : previousTranscriptMeasurementsRef.current.find(
+              (item) => item.key === firstRetainedPreviousKey,
+            );
+      const currentRetainedMeasurement =
+        firstRetainedPreviousKey === undefined
+          ? undefined
+          : currentMeasurements.find(
+              (item) => item.key === firstRetainedPreviousKey,
+            );
+      const prependedHeightDelta =
+        previousRetainedMeasurement && currentRetainedMeasurement
+          ? currentRetainedMeasurement.start - previousRetainedMeasurement.start
+          : 0;
+
+      if (prependedHeightDelta !== 0) {
+        setProgrammaticScrollTop(
+          (scrollRef.current?.scrollTop ?? 0) + prependedHeightDelta,
+        );
+      }
     }
+    previousGroupedMessageKeysRef.current = groupedMessageKeys;
+    previousTranscriptMeasurementsRef.current = currentMeasurements;
   }, [
     activeThreadId,
+    groupedMessageKeys,
     messages,
     scrollToBottom,
     setProgrammaticScrollTop,
