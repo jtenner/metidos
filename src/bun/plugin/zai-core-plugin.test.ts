@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 
+import { normalizeZaiModelsPayload } from "../../../core_plugins/zai";
 import type { RpcPluginInventoryPlugin } from "../rpc-schema/plugin";
 import { buildPluginEntrypoint } from "./entrypoint-build";
 import { parsePluginManifest } from "./manifest";
@@ -68,10 +69,17 @@ async function loadZaiConfigurations(
           key: "ZAI_API_KEY",
           required: false,
           secret: true,
-          value: "envApiKey" in input ? input.envApiKey : "env-token",
+          value: "envApiKey" in input ? input.envApiKey : null,
         },
       ],
-      permissions: ["provider:register"],
+      network: {
+        allow: [
+          "https://api.z.ai/api/paas/v4/models",
+          "https://api.z.ai/api/coding/paas/v4/models",
+        ],
+        enforceHttps: true,
+      },
+      permissions: ["network:fetch", "provider:register", "log:write"],
       settings: {
         missingRequiredKeys: [],
         values: { api_key: null, endpoint: input.endpoint ?? null },
@@ -102,9 +110,23 @@ async function loadZaiConfigurations(
 describe("core Z.AI plugin", () => {
   it("registers Z.AI over Pi's bundled provider using the general API endpoint by default", async () => {
     const parsedManifest = manifest();
-    expect(parsedManifest.permissions).toEqual(["provider:register"]);
+    expect(parsedManifest.permissions).toEqual([
+      "network:fetch",
+      "provider:register",
+      "log:write",
+    ]);
+    expect(parsedManifest.network).toEqual(
+      expect.objectContaining({
+        allow: [
+          "https://api.z.ai/api/paas/v4/models",
+          "https://api.z.ai/api/coding/paas/v4/models",
+        ],
+        enforceHttps: true,
+      }),
+    );
     expect(parsedManifest.providers).toEqual([
       expect.objectContaining({ id: "zai", timeoutMs: 30_000 }),
+      expect.objectContaining({ id: "zai_coding_plan", timeoutMs: 30_000 }),
     ]);
     expect(parsedManifest.settings).toEqual(
       expect.arrayContaining([
@@ -123,6 +145,7 @@ describe("core Z.AI plugin", () => {
     try {
       expect(setup.modelProviders.map((provider) => provider.id)).toEqual([
         "zai",
+        "zai_coding_plan",
       ]);
       expect(() =>
         validatePluginStartupRegistrations(setup, {
@@ -133,7 +156,8 @@ describe("core Z.AI plugin", () => {
       expect(configurations).toEqual([
         expect.objectContaining({
           api: "openai-completions",
-          apiKey: "env-token",
+          apiKey: "METIDOS_ZAI_API_KEY_NOT_CONFIGURED",
+          apiKeyMissing: true,
           authHeader: true,
           baseUrl: "https://api.z.ai/api/paas/v4",
           id: "default",
@@ -151,7 +175,7 @@ describe("core Z.AI plugin", () => {
               thinkingFormat: "zai",
               zaiToolStream: true,
             }),
-            id: "glm-5.1",
+            id: "glm-5.2",
             maxTokens: 131_072,
             reasoning: true,
           }),
@@ -177,10 +201,45 @@ describe("core Z.AI plugin", () => {
           timeoutMs: 30_000,
         },
       ]);
-      expect(registry.find("zai", "glm-5.1")?.provider).toBe("zai");
+      expect(registry.find("zai", "glm-5.2")?.provider).toBe("zai");
     } finally {
       runtime.dispose();
     }
+  });
+
+  it("normalizes OpenAI-compatible Z.AI model discovery payloads", () => {
+    expect(
+      normalizeZaiModelsPayload({
+        data: [
+          {
+            context_window: 262144,
+            id: "glm-5.2",
+            max_output_tokens: 131072,
+          },
+          {
+            capabilities: { vision: true },
+            id: "glm-5v-turbo",
+            name: "GLM-5V-Turbo",
+          },
+        ],
+        object: "list",
+      }),
+    ).toEqual([
+      {
+        contextWindow: 262144,
+        id: "glm-5.2",
+        input: ["text"],
+        maxTokens: 131072,
+        name: "GLM-5.2",
+      },
+      {
+        contextWindow: 200000,
+        id: "glm-5v-turbo",
+        input: ["text", "image"],
+        maxTokens: 131072,
+        name: "GLM-5V-Turbo",
+      },
+    ]);
   });
 
   it("can target the Coding Plan endpoint and reports a sentinel when no key is configured", async () => {

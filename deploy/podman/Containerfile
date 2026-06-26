@@ -1,14 +1,16 @@
 FROM docker.io/oven/bun:1.3.14-debian
 
+ARG NODE_VERSION=26.3.0
 ARG INSTALL_CHROMIUM=false
 ARG INSTALL_GH=false
+ARG INSTALL_GO=false
 ARG INSTALL_LATEX=false
 ARG INSTALL_RUST=false
 ARG INSTALL_MOONBIT=false
 ARG INSTALL_WASM_TOOLS=false
 ARG WASM_TOOLS_VERSION=1.251.0
 ARG BINARYEN_VERSION=130
-ARG MOONBIT_VERSION=0.9.3+b53c2807d
+ARG MOONBIT_VERSION=latest
 ARG WHY3_VERSION=1.8.2
 ARG ALT_ERGO_VERSION=2.6.3
 
@@ -17,17 +19,48 @@ ENV OPAMROOT=/opt/opam
 ENV OPAMSWITCH=moonbit-proof
 ENV CARGO_HOME=/home/metidos/.cargo
 ENV RUSTUP_HOME=/home/metidos/.rustup
+ENV GOPATH=/home/metidos/go
 ENV MOON_HOME=/opt/moonbit
 
 RUN apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates git nodejs openssh-client python3 ripgrep tini wget \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates git openssh-client python3 ripgrep tini wget xz-utils \
   && if [ "$INSTALL_CHROMIUM" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends chromium chromium-sandbox; fi \
   && if [ "$INSTALL_GH" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gh; fi \
+  && if [ "$INSTALL_GO" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends golang-go; fi \
   && if [ "$INSTALL_RUST" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends rustup; fi \
   && if [ "$INSTALL_MOONBIT" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends autoconf libgmp-dev m4 opam pkg-config z3 zlib1g-dev; fi \
   && if [ "$INSTALL_WASM_TOOLS" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends emscripten; fi \
   && if [ "$INSTALL_LATEX" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends latexmk poppler-utils texlive-fonts-extra texlive-fonts-recommended texlive-latex-base texlive-latex-extra texlive-latex-recommended texlive-pictures; fi \
   && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+  arch="$(uname -m)"; \
+  case "$arch" in \
+    x86_64) node_arch="x64" ;; \
+    aarch64|arm64) node_arch="arm64" ;; \
+    *) echo "unsupported arch: $arch" >&2; exit 1 ;; \
+  esac; \
+  node_dir="node-v${NODE_VERSION}-linux-${node_arch}"; \
+  tmp="$(mktemp -d)"; \
+  trap 'rm -rf "$tmp"' EXIT; \
+  wget -q -O "$tmp/${node_dir}.tar.xz" "https://nodejs.org/dist/v${NODE_VERSION}/${node_dir}.tar.xz"; \
+  wget -q -O "$tmp/SHASUMS256.txt" "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"; \
+  grep " ${node_dir}.tar.xz\$" "$tmp/SHASUMS256.txt" > "$tmp/node.sha256"; \
+  (cd "$tmp" && sha256sum -c node.sha256); \
+  rm -rf /opt/node-current; \
+  mkdir -p /opt/node-current; \
+  tar -xJf "$tmp/${node_dir}.tar.xz" --strip-components=1 -C /opt/node-current; \
+  chown -R root:root /opt/node-current; \
+  ln -sf /opt/node-current/bin/node /usr/local/bin/node; \
+  ln -sf /opt/node-current/bin/npm /usr/local/bin/npm; \
+  ln -sf /opt/node-current/bin/npx /usr/local/bin/npx; \
+  node --version; \
+  npm --version
+
+RUN set -eux; \
+  if [ "$INSTALL_GO" != "true" ]; then echo "Skipping optional Go toolchain"; exit 0; fi; \
+  go version; \
+  go env GOPATH
 
 RUN set -eux; \
   if [ "$INSTALL_RUST" != "true" ]; then echo "Skipping optional Rust toolchain"; exit 0; fi; \
@@ -59,7 +92,7 @@ RUN set -eux; \
     aarch64|arm64) target="linux-aarch64" ;; \
     *) echo "unsupported arch: $arch" >&2; exit 1 ;; \
   esac; \
-  encoded_version="$(printf '%s' "$MOONBIT_VERSION" | sed 's/+/%2B/g')"; \
+  if [ "$MOONBIT_VERSION" = "latest" ]; then encoded_version="latest"; else encoded_version="$(printf '%s' "$MOONBIT_VERSION" | sed 's/+/%2B/g')"; fi; \
   tmp="$(mktemp -d)"; \
   trap 'rm -rf "$tmp"' EXIT; \
   mkdir -p "$MOON_HOME"; \
@@ -125,13 +158,14 @@ ENV METIDOS_APP_DATA_DIR=/data
 ENV METIDOS_PORT=7599
 ENV METIDOS_TRUST_PROXY=true
 ENV METIDOS_WEB_SERVER_SHARE_HOST=127.0.0.1
+ENV METIDOS_NODE_BINARY=/usr/local/bin/node
 ENV BUN_CHROME_PATH=/usr/bin/chromium
 ENV METIDOS_CHROME_DEBUG_PORT=9222
 ENV METIDOS_CHROME_DEBUG_BACKEND_PORT=19222
 ENV METIDOS_CHROME_DEBUG_USER_DATA_DIR=/data/chrome-debug
 ENV CODEX_AUTH_JSON_PATH=/data/plugins/codex/.data/auth.json
 ENV MOONBIT_BIN_DIR=/opt/moonbit/bin
-ENV PATH=/opt/moonbit/bin:/home/metidos/.cargo/bin:/opt/opam/moonbit-proof/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV PATH=/opt/moonbit/bin:/home/metidos/.cargo/bin:/home/metidos/go/bin:/opt/opam/moonbit-proof/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN printf '%s\n' \
   'export OPAMROOT="${OPAMROOT:-/opt/opam}"' \

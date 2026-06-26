@@ -6,13 +6,13 @@ First-party plugin for Pi's built-in `zai` provider id. The plugin owns the prov
 
 ## Files
 
-- `metidos-plugin.json`: manifest, `ZAI_API_KEY` env declaration, `api_key` and `endpoint` settings, `piAuth` binding, and `zai` provider declaration.
-- `index.ts`: provider registration, static GLM model catalog, endpoint selection, and per-configuration `piAuth` records.
+- `metidos-plugin.json`: manifest, `ZAI_API_KEY` env declaration, `api_key` and `endpoint` settings, network allowlist for model discovery, `piAuth` binding, and `zai`/`zai_coding_plan` provider declarations.
+- `index.ts`: provider registration, upstream `/models` discovery, static GLM fallback catalog, endpoint selection, and per-configuration `piAuth` records.
 - `AGENTS.md`: maintenance guide.
 
 ## Behavior
 
-The plugin registers provider id `zai` and replaces Pi's bundled Z.AI catalog while still using Pi's OpenAI-compatible transport.
+The plugin registers provider ids `zai` and `zai_coding_plan` and replaces Pi's bundled Z.AI catalog while still using Pi's OpenAI-compatible transport. With an API key configured, it refreshes the catalog from the selected endpoint's `/models` response; without a key or after discovery failure, it uses the built-in fallback GLM catalog.
 
 Endpoint setting values:
 
@@ -28,7 +28,7 @@ If both are configured, the Plugin Setting wins. Clear the Plugin Setting when y
 
 ## Safety
 
-Do not log API keys, Authorization headers, prompts, model responses, or discovery payloads. Do not paste Coding Plan tokens or console API keys into chat.
+Do not log API keys, Authorization headers, prompts, model responses, or discovery payloads. Discovery warning logs may include HTTP status/error text only. Do not paste Coding Plan tokens or console API keys into chat.
 
 ## Embeddings and vector search
 

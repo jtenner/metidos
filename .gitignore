@@ -75,7 +75,6 @@ playwright/.cache/
 deploy/podman/compose*.yml
 !deploy/podman/compose.example.yml
 deploy/podman/LOCAL.md
-deploy/podman/*erryn*
 scripts/restart-podman-metidos.sh
 
 # Diagnostics, reports, and captured local output

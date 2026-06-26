@@ -811,18 +811,26 @@ let loggedDefaultNodeBinary: string | null = null;
 function assertTerminalNodeBinarySecurity(
   resolved: string,
   label: string,
+  remediation = "",
 ): string {
+  const messageSuffix = remediation ? ` ${remediation}` : "";
   const stat = statSync(resolved);
   if (!stat.isFile()) {
-    throw new Error(`${label} must point to an executable file.`);
+    throw new Error(
+      `${label} must point to an executable file.${messageSuffix}`,
+    );
   }
   try {
     accessSync(resolved, constants.X_OK);
   } catch {
-    throw new Error(`${label} must point to an executable file.`);
+    throw new Error(
+      `${label} must point to an executable file.${messageSuffix}`,
+    );
   }
   if ((stat.mode & 0o022) !== 0) {
-    throw new Error(`${label} must not be writable by group or other users.`);
+    throw new Error(
+      `${label} must not be writable by group or other users.${messageSuffix}`,
+    );
   }
   if (process.platform !== "win32") {
     // PTY bridge startup only trusts operator-controlled Node binaries: the
@@ -834,7 +842,9 @@ function assertTerminalNodeBinarySecurity(
       stat.uid !== 0 &&
       stat.uid !== effectiveUserId
     ) {
-      throw new Error(`${label} must be owned by root or the current user.`);
+      throw new Error(
+        `${label} must be owned by root or the current user.${messageSuffix}`,
+      );
     }
   }
   return resolved;
@@ -856,24 +866,18 @@ function resolveConfiguredTerminalNodeBinary(configured: string): string {
   return resolved;
 }
 
-function findNodeBinaryOnPath(pathValue: string | undefined): string | null {
-  const candidateNames = process.platform === "win32" ? ["node.exe"] : ["node"];
-  for (const entry of (pathValue ?? "").split(delimiter)) {
-    const directory = entry.trim();
-    if (!directory || !isAbsolute(directory)) {
-      continue;
-    }
-    for (const candidateName of candidateNames) {
-      const candidatePath = resolve(directory, candidateName);
-      try {
-        accessSync(candidatePath, constants.X_OK);
-        return candidatePath;
-      } catch {
-        // Try the next PATH entry.
-      }
-    }
-  }
-  return null;
+const DEFAULT_NODE_BINARY_REMEDIATION =
+  "Set METIDOS_NODE_BINARY to an absolute Node.js executable path to override.";
+
+function resolveDefaultNodeBinaryCandidate(candidatePath: string): string {
+  const resolved = normalizePath(realpathSync(candidatePath));
+  assertTerminalNodeBinarySecurity(
+    resolved,
+    "Resolved terminal node binary",
+    DEFAULT_NODE_BINARY_REMEDIATION,
+  );
+  assertDefaultNodeDirectorySecurity(resolved);
+  return resolved;
 }
 
 function assertDefaultNodeDirectorySecurity(resolved: string): void {
@@ -884,7 +888,7 @@ function assertDefaultNodeDirectorySecurity(resolved: string): void {
   const stat = statSync(directory);
   if ((stat.mode & 0o022) !== 0) {
     throw new Error(
-      "Resolved terminal node binary directory must not be writable by group or other users. Set METIDOS_NODE_BINARY to an absolute Node.js executable path to override.",
+      `Resolved terminal node binary directory must not be writable by group or other users. ${DEFAULT_NODE_BINARY_REMEDIATION}`,
     );
   }
   const effectiveUserId = process.geteuid?.();
@@ -894,28 +898,52 @@ function assertDefaultNodeDirectorySecurity(resolved: string): void {
     stat.uid !== effectiveUserId
   ) {
     throw new Error(
-      "Resolved terminal node binary directory must be owned by root or the current user. Set METIDOS_NODE_BINARY to an absolute Node.js executable path to override.",
+      `Resolved terminal node binary directory must be owned by root or the current user. ${DEFAULT_NODE_BINARY_REMEDIATION}`,
     );
   }
 }
 
 function resolveDefaultTerminalNodeBinary(): string {
-  const discovered = findNodeBinaryOnPath(process.env.PATH);
-  if (!discovered) {
-    throw new Error(
-      "Unable to resolve a terminal Node.js binary from PATH. Set METIDOS_NODE_BINARY to an absolute Node.js executable path.",
-    );
+  const candidateNames = process.platform === "win32" ? ["node.exe"] : ["node"];
+  let firstRejection: Error | null = null;
+
+  for (const entry of (process.env.PATH ?? "").split(delimiter)) {
+    const directory = entry.trim();
+    if (!directory || !isAbsolute(directory)) {
+      continue;
+    }
+    for (const candidateName of candidateNames) {
+      const candidatePath = resolve(directory, candidateName);
+      try {
+        accessSync(candidatePath, constants.X_OK);
+      } catch {
+        continue;
+      }
+      try {
+        const resolved = resolveDefaultNodeBinaryCandidate(candidatePath);
+        if (loggedDefaultNodeBinary !== resolved) {
+          // Same stderr-only rationale as configured terminal binaries: this
+          // path is already executable via PATH and helps diagnose PTY startup
+          // failures.
+          console.warn(
+            `Using resolved Node.js binary for terminals: ${resolved}`,
+          );
+          loggedDefaultNodeBinary = resolved;
+        }
+        return resolved;
+      } catch (error) {
+        firstRejection ??=
+          error instanceof Error ? error : new Error(String(error));
+      }
+    }
   }
-  const resolved = normalizePath(realpathSync(discovered));
-  assertTerminalNodeBinarySecurity(resolved, "Resolved terminal node binary");
-  assertDefaultNodeDirectorySecurity(resolved);
-  if (loggedDefaultNodeBinary !== resolved) {
-    // Same stderr-only rationale as configured terminal binaries: this path is
-    // already executable via PATH and helps diagnose PTY startup failures.
-    console.warn(`Using resolved Node.js binary for terminals: ${resolved}`);
-    loggedDefaultNodeBinary = resolved;
+
+  if (firstRejection) {
+    throw firstRejection;
   }
-  return resolved;
+  throw new Error(
+    `Unable to resolve a terminal Node.js binary from PATH. ${DEFAULT_NODE_BINARY_REMEDIATION}`,
+  );
 }
 
 export function resolveTerminalNodeBinary(): string {

@@ -740,6 +740,30 @@ describe("terminal node binary resolution", () => {
     });
   }
 
+  it("skips insecure default node candidates and uses the next safe candidate", () => {
+    if (process.platform === "win32") {
+      return;
+    }
+    const unsafeRoot = createTempDirectory();
+    const unsafeBinaryPath = join(unsafeRoot, "node");
+    writeFileSync(unsafeBinaryPath, "#!/bin/sh\nexit 0\n", { mode: 0o720 });
+    chmodSync(unsafeBinaryPath, 0o720);
+    const safeRoot = createTempDirectory();
+    const safeBinaryPath = join(safeRoot, "node");
+    writeFileSync(safeBinaryPath, "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+    chmodSync(safeBinaryPath, 0o700);
+    delete process.env.METIDOS_NODE_BINARY;
+    process.env.PATH = `${unsafeRoot}${delimiter}${safeRoot}`;
+
+    const originalWarn = console.warn;
+    console.warn = () => {};
+    try {
+      expect(resolveTerminalNodeBinary()).toBe(realpathSync(safeBinaryPath));
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
   for (const [name, directoryMode] of [
     ["group-writable", 0o770],
     ["world-writable", 0o707],

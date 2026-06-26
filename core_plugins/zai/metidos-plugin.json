@@ -6,7 +6,14 @@
   "main": "./index.ts",
   "description": "Registers Z.AI as a first-party OpenAI-compatible provider with selectable general API or Coding Plan endpoint auth.",
   "color": "#14b8a6",
-  "permissions": ["provider:register"],
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": [
+      "https://api.z.ai/api/paas/v4/models",
+      "https://api.z.ai/api/coding/paas/v4/models"
+    ],
+    "enforceHttps": true
+  },
   "env": [
     {
       "key": "ZAI_API_KEY",
@@ -45,6 +52,18 @@
       "provider": "zai",
       "source": "env",
       "value": "ZAI_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "zai_coding_plan",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "zai_coding_plan",
+      "source": "env",
+      "value": "ZAI_API_KEY"
     }
   ],
   "providers": [
@@ -53,6 +72,15 @@
       "name": "Z.AI",
       "description": "Registers Z.AI GLM chat/coding models through Pi's OpenAI-compatible transport using the configured Z.AI endpoint.",
       "timeoutMs": 30000
+    },
+    {
+      "id": "zai_coding_plan",
+      "name": "Z.AI Coding Plan",
+      "description": "Registers Z.AI models using the Coding Plan endpoint (https://api.z.ai/api/coding/paas/v4).",
+      "timeoutMs": 30000
     }
-  ]
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
 }

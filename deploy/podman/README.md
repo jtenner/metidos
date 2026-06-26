@@ -28,6 +28,7 @@ The base image always includes Bun, Git, Node.js, Python, basic build tools, and
 
 - **Browser automation** — Debian `chromium` and `chromium-sandbox`, with `BUN_CHROME_PATH=/usr/bin/chromium` and a headless Chrome DevTools Protocol listener on container loopback (`127.0.0.1:9222`).
 - **GitHub CLI** — `gh` from the Debian package repository.
+- **Go toolchain** — Debian `golang-go`, with `GOPATH=/home/metidos/go` and `$GOPATH/bin` on `PATH` for installed Go commands.
 - **Document toolchain** — `latexmk`, TeX Live LaTeX packages, and `poppler-utils`.
 - **MoonBit toolchain and proof dependencies** — MoonBit `0.9.3+b53c2807d` under `/opt/moonbit`, plus an image-global `/opt/opam` root with the `moonbit-proof` switch active by default, containing Why3 1.8.2 and Alt-Ergo 2.6.3. Startup runs `why3 config detect` when `$HOME/.why3.conf` is missing.
 - **WebAssembly tooling** — `wasm-tools 1.251.0` and Binaryen `version_130` under `/opt/binaryen-version_130` with tools such as `wasm-opt` symlinked into `/usr/local/bin`.
@@ -38,6 +39,7 @@ Choose which toolchains to include when running the installer or editing `deploy
 ```env
 INSTALL_CHROMIUM=false
 INSTALL_GH=false
+INSTALL_GO=false
 INSTALL_LATEX=false
 INSTALL_RUST=false
 INSTALL_MOONBIT=false

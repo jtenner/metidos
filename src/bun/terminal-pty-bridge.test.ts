@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const TERMINAL_PTY_BRIDGE_PATH = fileURLToPath(
   new URL("./terminal-pty-bridge.cjs", import.meta.url),
 );
+const TERMINAL_PTY_BRIDGE_RUNTIME = process.env.METIDOS_NODE_BINARY ?? "node";
 
 function runBridgeWithRawInput(
   input: string,
@@ -16,9 +17,13 @@ function runBridgeWithRawInput(
 }> {
   const { endStdin = true } = options;
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [TERMINAL_PTY_BRIDGE_PATH], {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const child = spawn(
+      TERMINAL_PTY_BRIDGE_RUNTIME,
+      [TERMINAL_PTY_BRIDGE_PATH],
+      {
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf8");
@@ -67,9 +72,13 @@ function runBridgeWithRuntimeMessage(
     "base64",
   );
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [TERMINAL_PTY_BRIDGE_PATH], {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const child = spawn(
+      TERMINAL_PTY_BRIDGE_RUNTIME,
+      [TERMINAL_PTY_BRIDGE_PATH],
+      {
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
     let stdout = "";
     let stderr = "";
     const timeout = setTimeout(() => {
