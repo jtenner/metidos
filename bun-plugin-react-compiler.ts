@@ -3,7 +3,7 @@
  * @description Module for bun plugin react compiler.
  */
 
-import babel from "@babel/core";
+import * as babel from "@babel/core";
 import BabelPluginReactCompiler from "babel-plugin-react-compiler";
 
 /** Configuration passed to the React compiler plugin invocation. */
